@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 space-y-6 bg-gradient-edge-devices min-h-full">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl bg-gradient-header bg-clip-text text-transparent">
+                System Management
+            </h1>
+            <p class="text-slate-600 mt-2">SuperAdmin control panel - Cloud-only secure access</p>
+        </div>
+        <span class="badge badge-superadmin">
+            SuperAdmin Only
+        </span>
+    </div>
+
+    <div class="alert-flash alert-default">
+        <i class="fa-solid fa-shield h-4 w-4"></i>
+        <p>
+          All management operations are processed in the cloud for security. This includes admin account management,
+          ML model uploads, and audit trail access.
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="card p-6 bg-gradient-card-blue">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm text-slate-600">Total Admins</p>
+                    <p class="text-3xl mt-2">{{ total_admins }}</p>
+                    <p class="text-sm text-green-600 mt-2">
+                        {{ active_admins }} active
+                    </p>
+                </div>
+                <div class="p-3 bg-gradient-blue rounded-xl shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-users h-6 w-6 text-white text-lg"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-6 bg-gradient-card-green">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm text-slate-600">Edge Nodes</p>
+                    <p class="text-3xl mt-2">{{ total_nodes }}</p>
+                    <p class="text-sm text-green-600 mt-2">
+                        {{ online_nodes }} online
+                    </p>
+                </div>
+                <div class="p-3 bg-gradient-green rounded-xl shadow-lg shadow-green-500/20">
+                    <i class="fa-solid fa-server h-6 w-6 text-white text-lg"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-6 bg-gradient-card-purple">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm text-slate-600">ML Models</p>
+                    <p class="text-3xl mt-2">{{ total_models }}</p>
+                    <p class="text-sm text-blue-600 mt-2">
+                        {{ active_models }} active
+                    </p>
+                </div>
+                <div class="p-3 bg-gradient-purple rounded-xl shadow-lg shadow-purple-500/20">
+                    <i class="fa-solid fa-upload h-6 w-6 text-white text-lg"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-6 bg-gradient-card-orange">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm text-slate-600">Audit Logs</p>
+                    <p class="text-3xl mt-2">{{ total_logs }}</p>
+                    <p class="text-sm text-slate-600 mt-2">Last 24 hours</p>
+                </div>
+                <div class="p-3 bg-gradient-orange rounded-xl shadow-lg shadow-orange-500/20">
+                    <i class="fa-solid fa-file-lines h-6 w-6 text-white text-lg"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabs-container space-y-4">
+        <div class="tabs-list">
+            <button class="tab-trigger active" data-tab="admins">Admin Accounts</button>
+            <button class="tab-trigger" data-tab="nodes">Edge Nodes Status</button>
+            <button class="tab-trigger" data-tab="models">ML Models</button>
+            <button class="tab-trigger" data-tab="audit">Audit Trail</button>
+        </div>
+
+        <div class="tab-content" id="admins">
+            <div class="card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg">Admin Account Management</h2>
+                    <button id="add-admin-btn" class="button-primary">
+                        <i class="fa-solid fa-users h-4 w-4 mr-2"></i>
+                        Add Admin
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="table-header">
+                                <th class="text-left p-4">Username</th>
+                                <th class="text-left p-4">Email</th>
+                                <th class="text-left p-4">Role</th>
+                                <th class="text-left p-4">API Key</th>
+                                <th class="text-left p-4">Last Login</th>
+                                <th class="text-left p-4">Status</th>
+                                <th class="text-left p-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for admin in admins %}
+                            <tr class="table-row border-b border-slate-100 hover:bg-slate-50">
+                                <td class="p-4 font-medium">{{ admin.username }}</td>
+                                <td class="p-4">{{ admin.email }}</td>
+                                <td class="p-4">
+                                    <span class="badge {% if admin.role == 'superadmin' %}badge-default{% else %}badge-outline{% endif %} capitalize">
+                                        {{ admin.role }}
+                                    </span>
+                                </td>
+                                <td class="p-4 font-mono text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-key h-3 w-3"></i>
+                                        {{ admin.apiKey[:16] }}...
+                                    </div>
+                                </td>
+                                <td class="p-4 text-sm">
+                                    {% if admin.lastLogin != 'Never' %}
+                                        {{ admin.lastLogin | from_iso | time_format }}
+                                    {% else %}
+                                        Never
+                                    {% endif %}
+                                </td>
+                                <td class="p-4">
+                                    <div class="flex items-center gap-2 capitalize">
+                                        <i class="fa-solid {% if admin.status == 'active' %}fa-circle-check text-green-600{% else %}fa-circle-xmark text-red-600{% endif %} h-4 w-4"></i>
+                                        {{ admin.status }}
+                                    </div>
+                                </td>
+                                <td class="p-4">
+                                    <button class="button-ghost button-sm">Edit</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content hidden" id="nodes">
+            <div class="card p-6">
+                <h2 class="text-lg mb-4">All Edge Nodes Status</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {% for node in edge_nodes %}
+                    <div class="p-4 border rounded-lg bg-white hover:shadow-md transition-shadow">
+                        <div class="flex items-start justify-between mb-3">
+                            <div>
+                                <h3 class="font-medium">{{ node.name }}</h3>
+                                <p class="text-sm text-slate-600">{{ node.location }}</p>
+                            </div>
+                            <span class="badge {% if node.status == 'online' %}badge-default{% else %}badge-destructive{% endif %} capitalize">
+                                {{ node.status }}
+                            </span>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-slate-600">Latency:</span>
+                                <span class="{% if node.latency < 25 %}text-green-600{% else %}text-orange-600{% endif %}">
+                                    {{ node.latency }}ms
+                                </span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-600">Load:</span>
+                                <span class="{% if node.load < 60 %}text-green-600{% elif node.load < 80 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                    {{ node.load }}%
+                                </span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-600">Sync Status:</span>
+                                <span class="badge {% if node.syncStatus == 'synced' %}badge-default{% else %}badge-outline{% endif %} text-xs capitalize">
+                                    {{ node.syncStatus }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content hidden" id="models">
+            <div class="card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg">ML Model Management</h2>
+                    <button id="upload-model-btn" class="button-primary">
+                        <i class="fa-solid fa-upload h-4 w-4 mr-2"></i>
+                        Upload New Model
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="table-header">
+                                <th class="text-left p-4">Version</th>
+                                <th class="text-left p-4">Uploaded At</th>
+                                <th class="text-left p-4">Uploaded By</th>
+                                <th class="text-left p-4">Size</th>
+                                <th class="text-left p-4">Accuracy</th>
+                                <th class="text-left p-4">Deployed Nodes</th>
+                                <th class="text-left p-4">Status</th>
+                                <th class="text-left p-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for model in ml_models %}
+                            <tr class="table-row border-b border-slate-100 hover:bg-slate-50">
+                                <td class="p-4 font-medium">{{ model.version }}</td>
+                                <td class="p-4">{{ model.uploadedAt | from_iso | time_format }}</td>
+                                <td class="p-4">{{ model.uploadedBy }}</td>
+                                <td class="p-4">{{ model.size }}</td>
+                                <td class="p-4 text-green-600">{{ model.accuracy }}%</td>
+                                <td class="p-4">{{ model.deployedNodes }}/16</td>
+                                <td class="p-4">
+                                    <span class="badge {% if model.status == 'active' %}badge-default{% elif model.status == 'pending' %}badge-outline{% else %}badge-secondary-static{% endif %} capitalize">
+                                        {{ model.status }}
+                                    </span>
+                                </td>
+                                <td class="p-4">
+                                    <button class="button-ghost button-sm">Deploy</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content hidden" id="audit">
+            <div class="card p-6">
+                <h2 class="text-lg mb-4">Audit Trail & Activity Logs</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="table-header">
+                                <th class="text-left p-4">Timestamp</th>
+                                <th class="text-left p-4">User</th>
+                                <th class="text-left p-4">Action</th>
+                                <th class="text-left p-4">Resource</th>
+                                <th class="text-left p-4">IP Address</th>
+                                <th class="text-left p-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in audit_logs %}
+                            <tr class="table-row border-b border-slate-100 hover:bg-slate-50">
+                                <td class="p-4 font-mono text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-clock h-3 w-3"></i>
+                                        {{ log.timestamp | from_iso | time_format }}
+                                    </div>
+                                </td>
+                                <td class="p-4 font-medium">{{ log.user }}</td>
+                                <td class="p-4">
+                                    <span class="badge badge-outline">{{ log.action }}</span>
+                                </td>
+                                <td class="p-4">{{ log.resource }}</td>
+                                <td class="p-4 font-mono text-xs">{{ log.ipAddress }}</td>
+                                <td class="p-4">
+                                    <div class="flex items-center gap-2 capitalize">
+                                        <i class="fa-solid {% if log.status == 'success' %}fa-circle-check text-green-600{% else %}fa-circle-xmark text-red-600{% endif %} h-4 w-4"></i>
+                                        {{ log.status }}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="add-admin-modal" class="modal-backdrop hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="text-lg">Create New Admin Account</h3>
+            <button id="close-admin-modal" class="text-slate-400 hover:text-slate-600">&times;</button>
+        </div>
+        <p class="text-sm text-slate-600 mb-4">Add a new admin or superadmin user to the system</p>
+
+        <div id="admin-validation-error" class="alert-destructive mb-4 hidden">
+            <i class="fa-solid fa-circle-exclamation h-4 w-4"></i>
+            <p id="error-message"></p>
+        </div>
+
+        <form id="add-admin-form" class="space-y-4">
+            <div class="space-y-2">
+                <label class="text-sm">Username (Email)</label>
+                <input id="admin-username" type="email" placeholder="admin.location@bankedge.com" class="input-full" required />
+                <p class="text-xs text-slate-500">Must end with @bankedge.com</p>
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm">Password</label>
+                <input id="admin-password" type="password" placeholder="Enter password" class="input-full" required />
+                <p class="text-xs text-slate-500">Must contain capital letter, small letter, and symbol</p>
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm">Role</label>
+                <select id="admin-role" class="input-full">
+                    <option value="admin">Admin</option>
+                    <option value="superadmin">SuperAdmin</option>
+                </select>
+            </div>
+        </form>
+        <div class="modal-footer">
+            <button id="create-admin-btn" class="button-primary">Create Account</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

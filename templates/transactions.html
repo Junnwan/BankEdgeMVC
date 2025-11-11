@@ -1,0 +1,555 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 space-y-6 bg-gradient-edge-devices min-h-full">
+    <div>
+        <h1 class="text-3xl bg-gradient-header bg-clip-text text-transparent">
+            Transaction Processing {% if userLocation %}- {{ userLocation }}{% endif %}
+        </h1>
+        <p class="text-slate-600 mt-2">
+            {% if userLocation %}
+                Payment processing with Stripe integration for {{ userLocation }} edge node
+            {% else %}
+                Stripe payment integration with edge/cloud processing
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="card p-6">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm text-slate-600">Total Volume</p>
+                    <p class="text-3xl mt-2">RM {{ (totalVolume / 1000) | round(1) }}k</p>
+                    <p class="text-sm text-green-600 mt-2 flex items-center gap-1">
+                        <i class="fa-solid fa-arrow-trend-up h-4 w-4"></i>
+                        +12.5% today
+                    </p>
+                </div>
+                <div class="p-3 bg-blue-100 rounded-lg">
+                    <i class="fa-solid fa-dollar-sign h-6 w-6 text-blue-600 text-lg"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-6">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm text-slate-600">Successful</p>
+                    <p class="text-3xl mt-2">{{ successfulTxns }}</p>
+                    <p class="text-sm text-slate-600 mt-2">
+                        {{ (successfulTxns / totalTxns * 100) | round(1) if totalTxns else 0 }}% success rate
+                    </p>
+                </div>
+                <div class="p-3 bg-green-100 rounded-lg">
+                    <i class="fa-solid fa-check-circle h-6 w-6 text-green-600 text-lg"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-6">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm text-slate-600">Edge Processed</p>
+                    <p class="text-3xl mt-2">{{ edgeProcessed }}</p>
+                    <p class="text-sm text-green-600 mt-2">
+                        {{ (edgeProcessed / totalTxns * 100) | round(0) if totalTxns else 0 }}% at edge
+                    </p>
+                </div>
+                <div class="p-3 bg-green-100 rounded-lg">
+                    <i class="fa-solid fa-arrow-right h-6 w-6 text-green-600 text-lg"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-6">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm text-slate-600">Avg Latency</p>
+                    <p class="text-3xl mt-2">{{ avgLatency | round(0) }}ms</p>
+                    <p class="text-sm text-slate-600 mt-2">Edge + Cloud</p>
+                </div>
+                <div class="p-3 bg-purple-100 rounded-lg">
+                    <i class="fa-solid fa-clock h-6 w-6 text-purple-600 text-lg"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabs-container space-y-4">
+        <div class="tabs-list">
+            <button class="tab-trigger active" data-tab="overview">Overview</button>
+            <button class="tab-trigger" data-tab="flow">Transaction Flow</button>
+            <button class="tab-trigger" data-tab="stripe">Stripe Integration</button>
+        </div>
+
+        <div class="tab-content" id="overview">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="card p-6">
+                    <h2 class="text-lg mb-4">Processing Location Distribution</h2>
+                    <div class="placeholder-chart h-64">
+                        [Pie Chart: Edge vs Cloud Processing]
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200">
+                        <div class="text-center">
+                            <div class="text-2xl text-green-600">{{ edgeProcessed }}</div>
+                            <div class="text-sm text-slate-600">Edge (Fast)</div>
+                            <div class="text-xs text-slate-500">
+                                Avg {{ (transactions | selectattr("processedAt", "equalto", "edge") | map(attribute="latency") | sum) / edgeProcessed | round(0) if edgeProcessed else 0 }}ms
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl text-blue-600">{{ cloudProcessed }}</div>
+                            <div class="text-sm text-slate-600">Cloud (Complex)</div>
+                            <div class="text-xs text-slate-500">
+                                Avg {{ (transactions | selectattr("processedAt", "equalto", "cloud") | map(attribute="latency") | sum) / cloudProcessed | round(0) if cloudProcessed else 0 }}ms
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-6">
+                    <h2 class="text-lg mb-4">Payment Status Distribution</h2>
+                    <div class="placeholder-chart h-64">
+                        [Pie Chart: Succeeded vs Failed vs Processing]
+                    </div>
+                </div>
+            </div>
+
+            <div class="card p-6 mt-6">
+                <h2 class="text-lg mb-4">Recent Transactions</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="table-header">
+                                <th class="text-left p-4">Transaction ID</th>
+                                <th class="text-left p-4">Type</th>
+                                <th class="text-left p-4">Amount</th>
+                                <th class="text-left p-4">Merchant</th>
+                                <th class="text-left p-4">Processed At</th>
+                                <th class="text-left p-4">Latency</th>
+                                <th class="text-left p-4">ML Status</th>
+                                <th class="text-left p-4">Payment Status</th>
+                                <th class="text-left p-4">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for txn in transactions[:10] %}
+                            <tr class="table-row border-b border-slate-100 hover:bg-slate-50">
+                                <td class="p-4 font-mono text-xs">{{ txn.id[:16] }}...</td>
+                                <td class="p-4 capitalize">{{ txn.type }}</td>
+                                <td class="p-4">RM {{ txn.amount | format_currency }}</td>
+                                <td class="p-4 text-sm">{{ txn.merchantName }}</td>
+                                <td class="p-4">
+                                    <span class="badge {% if txn.processedAt == 'edge' %}badge-default{% else %}badge-outline{% endif %} capitalize">
+                                        {{ txn.processedAt }}
+                                    </span>
+                                </td>
+                                <td class="p-4 {% if txn.latency < 30 %}text-green-600{% else %}text-yellow-600{% endif %}">
+                                    {{ txn.latency }}ms
+                                </td>
+                                <td class="p-4">
+                                    <span class="badge {% if txn.mlPrediction == 'approved' %}badge-default{% else %}badge-destructive{% endif %} capitalize">
+                                        {{ txn.mlPrediction }}
+                                    </span>
+                                </td>
+                                <td class="p-4">
+                                    <span class="badge badge-payment-{{ txn.stripeStatus }} capitalize">
+                                        {{ txn.stripeStatus }}
+                                    </span>
+                                </td>
+                                <td class="p-4">
+                                    <button class="button-ghost button-sm view-txn-btn" data-txn-id="{{ txn.id }}">
+                                        View
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content hidden" id="flow">
+            <div class="card p-6">
+                <h2 class="text-lg mb-4">Transaction Processing Pipeline</h2>
+                <div class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {% for stage in transactionFlow %}
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <div class="flex-1">
+                                    <div class="card p-4 bg-blue-50 border-blue-200">
+                                        <div class="text-center">
+                                            <div class="text-2xl text-blue-600">{{ stage.count }}</div>
+                                            <div class="text-sm text-slate-600 mt-1">{{ stage.stage }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% if not loop.last %}
+                                <i class="fa-solid fa-arrow-right h-5 w-5 text-slate-400"></i>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        <div class="card p-6 bg-green-50 border-green-200">
+                            <h3 class="font-medium mb-4 flex items-center gap-2">
+                                <div class="p-2 bg-green-600 text-white rounded">1</div>
+                                Edge Processing (Fast Path)
+                            </h3>
+                            <ul class="space-y-2 text-sm ml-4">
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check-circle h-4 w-4 text-green-600 mt-0-5 flex-shrink-0"></i>
+                                    <span>Transaction received at local edge node</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check-circle h-4 w-4 text-green-600 mt-0-5 flex-shrink-0"></i>
+                                    <span>ML fraud detection (~15ms inference)</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check-circle h-4 w-4 text-green-600 mt-0-5 flex-shrink-0"></i>
+                                    <span>Balance validation from local cache</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check-circle h-4 w-4 text-green-600 mt-0-5 flex-shrink-0"></i>
+                                    <span>Stripe API call for payment processing</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check-circle h-4 w-4 text-green-600 mt-0-5 flex-shrink-0"></i>
+                                    <span>Response returned (~30ms total)</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="card p-6 bg-blue-50 border-blue-200">
+                            <h3 class="font-medium mb-4 flex items-center gap-2">
+                                <div class="p-2 bg-blue-600 text-white rounded">2</div>
+                                Cloud Processing (Complex Path)
+                            </h3>
+                            <ul class="space-y-2 text-sm ml-4">
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check-circle h-4 w-4 text-blue-600 mt-0-5 flex-shrink-0"></i>
+                                    <span>Large/complex transaction routed to cloud</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check-circle h-4 w-4 text-blue-600 mt-0-5 flex-shrink-0"></i>
+                                    <span>Deep ML analysis with historical patterns</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check-circle h-4 w-4 text-blue-600 mt-0-5 flex-shrink-0"></i>
+                                    <span>Compliance and regulatory checks</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check-circle h-4 w-4 text-blue-600 mt-0-5 flex-shrink-0"></i>
+                                    <span>Advanced fraud pattern matching</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check-circle h-4 w-4 text-blue-600 mt-0-5 flex-shrink-0"></i>
+                                    <span>Stripe processing + data archival (~80ms+ total)</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card p-6 mt-6">
+                <h2 class="text-lg mb-4">Processing Decision Logic</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="p-4 bg-slate-50 rounded-lg">
+                        <h4 class="font-medium mb-2">Edge Processing Criteria:</h4>
+                        <ul class="text-sm space-y-1 ml-4">
+                            <li>• Transaction amount &lt; RM 5,000</li>
+                            <li>• Standard transaction types (transfer, withdrawal, deposit)</li>
+                            <li>• Customer has good standing (no fraud history)</li>
+                            <li>• Balance information cached locally</li>
+                            <li>• Low ML confidence threshold required (&gt; 70%)</li>
+                        </ul>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-lg">
+                        <h4 class="font-medium mb-2">Cloud Processing Criteria:</h4>
+                        <ul class="text-sm space-y-1 ml-4">
+                            <li>• High-value transactions (≥ RM 5,000)</li>
+                            <li>• Cross-border or international payments</li>
+                            <li>• Suspicious patterns detected by edge ML</li>
+                            <li>• Regulatory compliance checks required</li>
+                            <li>• Historical analysis needed for decision-making</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content hidden" id="stripe">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-3 bg-green-100 rounded-lg">
+                            <i class="fa-solid fa-credit-card h-6 w-6 text-green-600 text-lg"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg">Demo Transaction</h2>
+                            <p class="text-sm text-slate-600">Test the transaction processing flow with Stripe integration</p>
+                        </div>
+                    </div>
+
+                    <form id="demo-transaction-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="space-y-2">
+                                <label for="paymentMethod" class="text-sm">Payment Method</label>
+                                <select id="paymentMethod" class="input-full" name="paymentMethod">
+                                    <option value="credit_card">Credit Card</option>
+                                    <option value="debit_card">Debit Card</option>
+                                    <option value="fpx">FPX Online Banking</option>
+                                    <option value="tng">Touch n Go eWallet</option>
+                                    <option value="grabpay">GrabPay</option>
+                                    <option value="boost">Boost</option>
+                                    <option value="online_banking">Online Banking</option>
+                                    <option value="ewallet">E-Wallet</option>
+                                </select>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label for="recipientAccount" class="text-sm">Recipient Account Number</label>
+                                <input id="recipientAccount" type="text" placeholder="Enter account number" class="input-full" required name="recipientAccount" pattern="[0-9]*" />
+                            </div>
+
+                            <div class="space-y-2">
+                                <label for="amount" class="text-sm">Amount (RM)</label>
+                                <input id="amount" type="number" placeholder="0.00" class="input-full" required min="0.01" step="0.01" name="amount" />
+                            </div>
+
+                            <div class="space-y-2">
+                                <label for="reference" class="text-sm">Reference / Notes</label>
+                                <input id="reference" type="text" placeholder="Payment reference" class="input-full" name="reference" />
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-200">
+                            <button type="submit" id="process-txn-btn" class="button-primary w-full md:w-auto">
+                                <i class="fa-solid fa-credit-card h-4 w-4 mr-2"></i>
+                                Process Demo Transaction
+                            </button>
+                            <p class="text-xs text-slate-600 mt-2">
+                                This will simulate a transaction through the edge/cloud processing pipeline with Stripe integration
+                            </p>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="p-3 bg-purple-100 rounded-lg">
+                            <i class="fa-solid fa-credit-card h-6 w-6 text-purple-600 text-lg"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg">Stripe Payment Gateway Integration</h2>
+                            <p class="text-sm text-slate-600">Real-time payment processing with edge optimization</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        <div>
+                            <h3 class="font-medium mb-3">Integration Architecture</h3>
+                            <div class="space-y-3 text-sm">
+                                <div class="p-3 bg-blue-50 rounded-lg">
+                                    <div class="font-medium mb-1">Edge Layer</div>
+                                    <div class="text-slate-600">Stripe API calls made from edge nodes for low-latency processing</div>
+                                </div>
+                                <div class="p-3 bg-green-50 rounded-lg">
+                                    <div class="font-medium mb-1">Webhook Handling</div>
+                                    <div class="text-slate-600">Real-time payment status updates via Stripe webhooks</div>
+                                </div>
+                                <div class="p-3 bg-purple-50 rounded-lg">
+                                    <div class="font-medium mb-1">Security</div>
+                                    <div class="text-slate-600">PCI-compliant tokenization, encrypted API keys at edge</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="font-medium mb-3">Payment Methods Supported</h3>
+                            <div class="grid grid-cols-2 gap-3">
+                                {% for method in ['Credit Card', 'Debit Card', 'FPX', 'Touch n Go', 'GrabPay', 'Boost', 'Online Banking', 'E-Wallet'] %}
+                                <div class="p-3 border border-slate-200 rounded-lg text-center text-sm">
+                                    {{ method }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card p-6 mt-6" id="txn-details-card">
+                <h2 class="text-lg mb-4">Sample Transaction Details</h2>
+                <div id="txn-details-content">
+                    <p class="text-sm text-slate-600">Click "View" on any transaction in the table to see details</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // In a real application, the data in the template would be passed here via JSON.
+    // For this simulation, we'll store the transaction data directly in the DOM.
+    const allTransactionsData = JSON.parse('{{ transactions | tojson | safe }}');
+
+    // Function to render transaction details in the card
+    function renderTransactionDetails(txn) {
+        const content = document.getElementById('txn-details-content');
+
+        // Helper to get payment badge HTML
+        const getPaymentBadge = (status) => {
+            let className = '';
+            let text = status.charAt(0).toUpperCase() + status.slice(1);
+            if (status === 'succeeded') className = 'badge-payment-succeeded';
+            else if (status === 'failed') className = 'badge-payment-failed';
+            else if (status === 'processing') className = 'badge-payment-processing';
+            else className = 'badge-outline';
+            return `<span class="badge ${className} capitalize">${text}</span>`;
+        };
+
+        // Helper to format currency
+        const formatCurrency = (amount) => {
+            return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        content.innerHTML = `
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-sm text-slate-600">Transaction ID</p>
+                        <p class="font-mono text-sm mt-1">${txn.id}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-600">Customer ID</p>
+                        <p class="font-mono text-sm mt-1">${txn.customerId}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-600">Amount</p>
+                        <p class="text-lg mt-1">RM ${formatCurrency(txn.amount)}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-600">Merchant</p>
+                        <p class="mt-1">${txn.merchantName}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-600">Processing Location</p>
+                        <span class="badge ${txn.processedAt === 'edge' ? 'badge-default' : 'badge-outline'} capitalize mt-1">
+                            ${txn.processedAt}
+                        </span>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-600">Latency</p>
+                        <p class="mt-1 ${txn.latency < 30 ? 'text-green-600' : 'text-orange-600'}">${txn.latency}ms</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-600">ML Prediction</p>
+                        <span class="badge ${txn.mlPrediction === 'approved' ? 'badge-default' : 'badge-destructive'} capitalize mt-1">
+                            ${txn.mlPrediction}
+                        </span>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-600">Stripe Status</p>
+                        ${getPaymentBadge(txn.stripeStatus)}
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-200 flex justify-end">
+                    <button class="button-primary button-sm retry-txn-btn" data-txn-id="${txn.id}" ${txn.stripeStatus === 'succeeded' ? 'disabled' : ''}>
+                        <i class="fa-solid fa-rotate-right h-4 w-4 mr-2"></i>
+                        Retry Transaction
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    // Existing logic from main.js is here, omitted for brevity.
+    // ... (Your previous JS code for startSync and tabs) ...
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // ... (Your previous JS code for sync button and admin modal) ...
+
+        // ML Insights/Settings Tab Logic (Reused)
+        const tabTriggers = document.querySelectorAll('.tabs-list .tab-trigger');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabTriggers.forEach(trigger => {
+            trigger.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-tab');
+
+                // Deactivate all triggers and hide all contents
+                tabTriggers.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(c => c.classList.add('hidden'));
+
+                // Activate current trigger
+                this.classList.add('active');
+
+                // Show target content
+                const targetContent = document.getElementById(targetId);
+                if (targetContent) {
+                    targetContent.classList.remove('hidden');
+                }
+            });
+        });
+
+        // Transaction View Button Logic
+        document.querySelectorAll('.view-txn-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const txnId = this.getAttribute('data-txn-id');
+                const txn = allTransactionsData.find(t => t.id === txnId);
+                if (txn) {
+                    renderTransactionDetails(txn);
+                }
+            });
+        });
+
+        // Demo Transaction Form Logic
+        const demoForm = document.getElementById('demo-transaction-form');
+        const processBtn = document.getElementById('process-txn-btn');
+
+        if (demoForm) {
+            demoForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                // Simulate processing state
+                processBtn.disabled = true;
+                processBtn.innerHTML = `<i class="fa-solid fa-rotate-right h-4 w-4 mr-2 fa-spin"></i> Processing Transaction...`;
+
+                // Simulate API call delay
+                setTimeout(() => {
+                    alert('SUCCESS: Demo transaction processed successfully! (Check table for new transaction on next page load)');
+                    processBtn.disabled = false;
+                    processBtn.innerHTML = `<i class="fa-solid fa-credit-card h-4 w-4 mr-2"></i> Process Demo Transaction`;
+
+                    // In a real app, this would be an API call to Flask which then updates the database.
+                    // Here, we just simulate success.
+                }, 2000);
+            });
+        }
+
+        // Transaction Retry Logic (needs to be attached to dynamically created buttons)
+        document.getElementById('txn-details-content').addEventListener('click', function(e) {
+            const target = e.target.closest('.retry-txn-btn');
+            if (target) {
+                const txnId = target.getAttribute('data-txn-id');
+                target.disabled = true;
+                target.innerHTML = `<i class="fa-solid fa-rotate-right h-4 w-4 mr-2 fa-spin"></i> Retrying...`;
+
+                setTimeout(() => {
+                    alert(`SUCCESS: Transaction ${txnId} retried and status changed to Succeeded! Reloading page...`);
+                    // In a real app, you'd only update the specific row or data, but here we reload the whole data-sync page.
+                    window.location.reload();
+                }, 1500);
+            }
+        });
+    });
+</script>
+{% endblock %}

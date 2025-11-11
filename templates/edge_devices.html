@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 space-y-6 bg-gradient-edge-devices min-h-full">
+    <div>
+        {% if user_location and user_location != 'All Regions' %}
+        <h1 class="text-3xl bg-gradient-header bg-clip-text text-transparent">
+            Edge Device Management - {{ user_location }}
+        </h1>
+        <p class="text-slate-600 mt-2">
+            Monitor and manage the {{ user_location }} edge node
+        </p>
+        {% else %}
+        <h1 class="text-3xl bg-gradient-header bg-clip-text text-transparent">
+            Edge Device Management
+        </h1>
+        <p class="text-slate-600 mt-2">
+            Monitor and manage edge computing nodes across all regions
+        </p>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="card-summary p-6 bg-gradient-card-green">
+            <div class="flex items-center gap-3">
+                <div class="p-3 bg-gradient-green rounded-xl shadow-lg shadow-green-500/20">
+                    <i class="fa-solid fa-server h-6 w-6 text-white text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-600">Online Nodes</p>
+                    <p class="text-2xl mt-1">{{ summary.online_nodes }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-summary p-6 bg-gradient-card-yellow">
+            <div class="flex items-center gap-3">
+                <div class="p-3 bg-gradient-yellow rounded-xl shadow-lg shadow-yellow-500/20">
+                    <i class="fa-solid fa-chart-line h-6 w-6 text-white text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-600">Avg Load</p>
+                    <p class="text-2xl mt-1">{{ summary.avg_load }}%</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-summary p-6 bg-gradient-card-blue">
+            <div class="flex items-center gap-3">
+                <div class="p-3 bg-gradient-blue rounded-xl shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-map-pin h-6 w-6 text-white text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-600">Regions</p>
+                    <p class="text-2xl mt-1">{{ summary.regions }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {% for device in devices %}
+        <div class="card-device p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between mb-4">
+                <div class="flex items-start gap-3">
+                    <div class="p-2 rounded-lg {% if device.status == 'online' %}bg-green-100{% else %}bg-yellow-100{% endif %}">
+                        <i class="fa-solid fa-server h-5 w-5 {% if device.status == 'online' %}text-green-600{% else %}text-yellow-600{% endif %}"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-medium">{{ device.name }}</h3>
+                        <p class="text-sm text-slate-600">{{ device.id }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="h-2 w-2 rounded-full status-{{ device.status }} animate-pulse" />
+                    <span class="badge {% if device.status == 'online' %}badge-default{% else %}badge-destructive{% endif %}">
+                        {{ device.status | upper }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex items-center gap-2 text-sm text-slate-600">
+                    <i class="fa-solid fa-map-pin h-4 w-4"></i>
+                    <span>{{ device.location }}</span>
+                    <span class="badge badge-outline ml-auto">{{ device.region }}</span>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-600">CPU Load</span>
+                        <span class="{% if device.load < 60 %}text-green-600{% elif device.load < 80 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ device.load }}%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" style="--progress-width: {{ device.load }}%; width: var(--progress-width);"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 pt-3 border-t border-slate-200">
+                    <div>
+                        <p class="text-xs text-slate-600">Latency</p>
+                        <p class="mt-1 {% if device.latency < 25 %}text-green-600{% else %}text-yellow-600{% endif %}">
+                            {{ device.latency }}ms
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-600">TPS</p>
+                        <p class="mt-1">{{ device.transactionsPerSec }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-600">Last Sync</p>
+                        <p class="mt-1 text-xs flex items-center gap-1">
+                            <i class="fa-solid fa-clock h-3 w-3"></i>
+                            {{ device.lastSync | from_iso | time_format }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-200 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="badge {% if device.syncStatus == 'synced' %}badge-default{% else %}badge-outline{% endif %}">
+                            {{ device.syncStatus | upper }}
+                        </span>
+                        {% if device.syncStatus == 'synced' %}
+                        <i class="fa-solid fa-check-circle h-4 w-4 text-green-600"></i>
+                        {% endif %}
+                    </div>
+                    <button class="button-sync button-outline button-sm" data-device-id="{{ device.id }}">
+                        <i class="fa-solid fa-rotate-right h-4 w-4 mr-2"></i>
+                        Sync
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="card-detail-table p-6 shadow-sm">
+        <h2 class="text-lg mb-1">Device Details</h2>
+        <p class="text-sm text-slate-600 mb-4">Comprehensive edge node information</p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="table-header">
+                        <th class="text-left p-4">Device</th>
+                        <th class="text-left p-4">Location</th>
+                        <th class="text-left p-4">Status</th>
+                        <th class="text-left p-4">Latency</th>
+                        <th class="text-left p-4">Load</th>
+                        <th class="text-left p-4">TPS</th>
+                        <th class="text-left p-4">Last Sync</th>
+                        <th class="text-left p-4">Sync Status</th>
+                        <th class="text-left p-4">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for device in devices %}
+                    <tr class="table-row border-b border-slate-100 hover:bg-slate-50">
+                        <td class="p-4">
+                            <div class="font-medium">{{ device.name }}</div>
+                            <div class="text-xs text-slate-600">{{ device.id }}</div>
+                        </td>
+                        <td class="p-4">{{ device.location }}</td>
+                        <td class="p-4">
+                            <span class="badge {% if device.status == 'online' %}badge-default{% else %}badge-destructive{% endif %}">
+                                {{ device.status | upper }}
+                            </span>
+                        </td>
+                        <td class="p-4 {% if device.latency < 25 %}text-green-600{% else %}text-yellow-600{% endif %}">
+                            {{ device.latency }}ms
+                        </td>
+                        <td class="p-4 {% if device.load < 60 %}text-green-600{% elif device.load < 80 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                            {{ device.load }}%
+                        </td>
+                        <td class="p-4">{{ device.transactionsPerSec }}</td>
+                        <td class="p-4 text-xs">
+                            {{ device.lastSync | from_iso | time_format }}
+                        </td>
+                        <td class="p-4">
+                            <span class="badge {% if device.syncStatus == 'synced' %}badge-default{% else %}badge-outline{% endif %}">
+                                {{ device.syncStatus | upper }}
+                            </span>
+                        </td>
+                        <td class="p-4">
+                            <button class="button-sync button-ghost button-sm" data-device-id="{{ device.id }}">
+                                <i class="fa-solid fa-rotate-right h-4 w-4"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Existing logic from main.js is here, omitted for brevity.
+    // ... (Your previous JS code for startSync and tabs) ...
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // ... (Your previous JS code for sync button and admin modal) ...
+
+        // ML Insights/Settings Tab Logic (Reused)
+        const tabTriggers = document.querySelectorAll('.tabs-list .tab-trigger');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabTriggers.forEach(trigger => {
+            trigger.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-tab');
+
+                // Deactivate all triggers and hide all contents
+                tabTriggers.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(c => c.classList.add('hidden'));
+
+                // Activate current trigger
+                this.classList.add('active');
+
+                // Show target content
+                const targetContent = document.getElementById(targetId);
+                if (targetContent) {
+                    targetContent.classList.remove('hidden');
+                }
+            });
+        });
+
+        // Transaction View Button Logic
+        document.querySelectorAll('.view-txn-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const txnId = this.getAttribute('data-txn-id');
+                const txn = allTransactionsData.find(t => t.id === txnId);
+                if (txn) {
+                    renderTransactionDetails(txn);
+                }
+            });
+        });
+
+        // Demo Transaction Form Logic
+        const demoForm = document.getElementById('demo-transaction-form');
+        const processBtn = document.getElementById('process-txn-btn');
+
+        if (demoForm) {
+            demoForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                // Simulate processing state
+                processBtn.disabled = true;
+                processBtn.innerHTML = `<i class="fa-solid fa-rotate-right h-4 w-4 mr-2 fa-spin"></i> Processing Transaction...`;
+
+                // Simulate API call delay
+                setTimeout(() => {
+                    alert('SUCCESS: Demo transaction processed successfully! (Check table for new transaction on next page load)');
+                    processBtn.disabled = false;
+                    processBtn.innerHTML = `<i class="fa-solid fa-credit-card h-4 w-4 mr-2"></i> Process Demo Transaction`;
+
+                    // In a real app, this would be an API call to Flask which then updates the database.
+                    // Here, we just simulate success.
+                }, 2000);
+            });
+        }
+
+        // Transaction Retry Logic (needs to be attached to dynamically created buttons)
+        document.getElementById('txn-details-content').addEventListener('click', function(e) {
+            const target = e.target.closest('.retry-txn-btn');
+            if (target) {
+                const txnId = target.getAttribute('data-txn-id');
+                target.disabled = true;
+                target.innerHTML = `<i class="fa-solid fa-rotate-right h-4 w-4 mr-2 fa-spin"></i> Retrying...`;
+
+                setTimeout(() => {
+                    alert(`SUCCESS: Transaction ${txnId} retried and status changed to Succeeded! Reloading page...`);
+                    // In a real app, you'd only update the specific row or data, but here we reload the whole data-sync page.
+                    window.location.reload();
+                }, 1500);
+            }
+        });
+    });
+</script>
+{% endblock %}
