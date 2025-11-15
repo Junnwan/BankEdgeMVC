@@ -108,48 +108,49 @@
 
   <!-- Tab Content: Stripe Integration -->
   <div class="tab-content" id="content-stripe" role="tabpanel">
+
+    <!-- MODIFIED: Stripe Payment Form -->
     <div class="card">
       <div class="card-header">
         <div class="stat-card-icon icon-bg-green" style="border-radius: 8px;"><i class="fas fa-credit-card"></i></div>
         <div style="flex-grow: 1; margin-left: 16px;">
-          <h2 class="card-title" style="margin: 0;">Demo Transaction</h2>
-          <p class="card-subtitle" style="margin: 4px 0 0 0;">Test the transaction processing flow with Stripe integration</p>
+          <h2 class="card-title" style="margin: 0;">Process a Payment via Stripe Checkout</h2>
+          <p class="card-subtitle" style="margin: 4px 0 0 0;">Test the full flow with Cards, FPX, GrabPay, and TNG.</p>
         </div>
       </div>
-      <form id="demo-txn-form" class="demo-form">
+
+      <!-- This is now a simple form. Stripe handles the payment UI. -->
+      <form id="payment-form" class="demo-form">
         <div class="form-grid">
           <div class="form-group">
-            <label for="paymentMethod">Payment Method</label>
-            <select id="paymentMethod" class="form-input">
-              <option value="credit_card">Credit Card</option>
-              <option value="debit_card">Debit Card</option>
-              <option value="fpx">FPX Online Banking</option>
-              <option value="tng">Touch n Go eWallet</option>
-              <option value="grabpay">GrabPay</option>
-            </select>
+            <label for="amount">Amount (RM)</label>
+            <input type="number" id="amount" class="form-input" placeholder="0.00" min="0.50" step="0.01" required> <!-- Stripe has minimums, 50 cents -->
           </div>
           <div class="form-group">
             <label for="recipientAccount">Recipient Account Number</label>
-            <input type="text" id="recipientAccount" class="form-input" placeholder="Enter account number (numbers only)" required>
-          </div>
-          <div class="form-group">
-            <label for="amount">Amount (RM)</label>
-            <input type="number" id="amount" class="form-input" placeholder="0.00" min="0.01" step="0.01" required>
+            <input type="text" id="recipientAccount" class="form-input" placeholder="Enter account number" required>
           </div>
           <div class="form-group">
             <label for="reference">Reference / Notes</label>
             <input type="text" id="reference" class="form-input" placeholder="Payment reference">
           </div>
         </div>
+
+        <!-- This is where error/success messages will appear -->
+        <div id="payment-message" class="alert-banner" style="display: none; margin-top: 16px;"></div>
+
         <div class="form-footer">
-          <button type="submit" class="btn-sync" id="demo-txn-btn">
-            <i class="fas fa-credit-card"></i> Process Demo Transaction
+          <button type="submit" class="btn-sync" id="payment-submit-btn">
+            <i class="fas fa-credit-card"></i> Proceed to Payment
           </button>
-          <p>This will simulate a transaction through the edge/cloud processing pipeline.</p>
+          <p style="font-size: 0.8rem; color: var(--muted-text); margin-top: 8px;">
+            You will be redirected to Stripe's secure checkout page.
+          </p>
         </div>
       </form>
     </div>
 
+    <!-- ... (Rest of the Stripe info cards are unchanged) ... -->
     <div class="card">
         <h2 class="card-title">Stripe Payment Gateway Integration</h2>
         <div class="chart-grid">

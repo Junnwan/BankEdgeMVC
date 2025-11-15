@@ -1,36 +1,61 @@
 import random
-from flask import Blueprint, jsonify
-from datetime import datetime, timedelta
+import os
+import stripe
+from flask import Blueprint, jsonify, request
+from datetime import datetime, timedelta, timezone
+
+try:
+    # New versions (v7+)
+    StripeError = stripe.error.StripeError
+except AttributeError:
+    # Old versions (v5 and below)
+    StripeError = stripe.StripeError
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
+
+# --- NEW: Stripe API Key Configuration ---
+# IMPORTANT: Set this as an environment variable.
+# For testing, you can temporarily hardcode your Stripe TEST key here.
+# DO NOT commit your real secret key to GitHub.
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
+
+# --- In-Memory Database ---
+persisted_transactions = []
 
 # --- Data Generation Logic (Translated to Python) ---
 
 locations = ["Johor", "Kedah", "Kelantan", "Malacca", "NegeriSembilan", "Pahang", "Penang", "Perak", "Perlis", "Sabah", "Sarawak", "Selangor", "Terengganu", "KL", "Labuan", "Putrajaya"]
-merchants = ['TNG eWallet', 'Maybank', 'CIMB Bank', 'GrabPay', 'ShopeePay', 'Public Bank', 'Boost', 'RHB Bank']
+merchants = ['Maybank', 'CIMB Bank', 'Public Bank', 'RHB Bank', 'GrabPay', 'FPX Payment']
 
 def generate_edge_devices():
     devices = []
     for i, loc in enumerate(locations):
+
+        # --- All nodes are online by default ---
+        status = 'online'
+
         devices.append({
             'id': f'edge-{i + 1}',
             'name': f'Edge Node {loc}',
             'location': f'{loc}, Malaysia',
-            'status': 'offline' if random.random() < 0.1 else 'online',
+            'status': status,
             'latency': random.uniform(10, 40),
             'load': random.uniform(10, 90),
             'transactionsPerSec': random.uniform(50, 250),
             'region': 'Federal Territory' if loc in ['KL', 'Labuan', 'Putrajaya'] else 'State',
-            'lastSync': (datetime.utcnow() - timedelta(minutes=random.uniform(1, 10))).isoformat() + 'Z',
+            'lastSync': (datetime.now(timezone.utc) - timedelta(minutes=random.uniform(1, 10))).isoformat(),
             'syncStatus': 'pending' if random.random() < 0.2 else 'synced'
         })
     return devices
 
 def generate_transactions(count=5):
     transactions = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for i in range(count):
         ml_prediction = random.random()
+
+        # --- MODIFIED: Added stripeStatus ---
         if ml_prediction < 0.8:
             ml_status, stripe_status = 'approved', 'succeeded'
         elif ml_prediction < 0.95:
@@ -45,9 +70,9 @@ def generate_transactions(count=5):
             'amount': random.uniform(50, 5000),
             'type': 'Withdrawal' if random.random() > 0.5 else 'Transfer',
             'mlPrediction': ml_status,
-            'stripeStatus': stripe_status,
+            'stripeStatus': stripe_status, # <-- NEW FIELD
             'confidence': 0.8 + random.random() * 0.2,
-            'timestamp': (now - timedelta(minutes=i*random.uniform(1, 5))).isoformat() + 'Z',
+            'timestamp': (now - timedelta(minutes=i*random.uniform(1, 5))).isoformat(),
             'deviceId': f'edge-{random.randint(1, 16)}',
             'processedAt': processed_at,
             'latency': random.uniform(10, 30) if processed_at == 'edge' else random.uniform(70, 120),
@@ -58,10 +83,10 @@ def generate_transactions(count=5):
 
 def generate_latency_history(points=15):
     data = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for i in range(points):
         data.append({
-            'timestamp': (now - timedelta(seconds=(points - i) * 5)).isoformat() + 'Z',
+            'timestamp': (now - timedelta(seconds=(points - i) * 5)).isoformat(),
             'edge': random.uniform(10, 25),
             'cloud': random.uniform(80, 120),
             'hybrid': random.uniform(35, 55)
@@ -70,10 +95,10 @@ def generate_latency_history(points=15):
 
 def generate_ml_metrics(points=20):
     data = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for i in range(points):
         data.append({
-            'timestamp': (now - timedelta(seconds=(points - i) * 10)).isoformat() + 'Z',
+            'timestamp': (now - timedelta(seconds=(points - i) * 10)).isoformat(),
             'accuracy': 0.85 + random.random() * 0.12,
             'precision': 0.82 + random.random() * 0.15,
             'recall': 0.88 + random.random() * 0.1,
@@ -88,7 +113,7 @@ def generate_processing_decisions(count=10):
         'cloud': ["Historical analysis needed", "Complex pattern recognition", "Regulatory compliance check", "Cross-account analysis"]
     }
     types = ["Transaction", "Authentication", "Balance Inquiry", "New Account Flag"]
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for i in range(count):
         decision = 'edge' if random.random() > 0.3 else 'cloud'
         data.append({
@@ -98,7 +123,7 @@ def generate_processing_decisions(count=10):
             'reason': random.choice(reasons[decision]),
             'priority': random.choice(['high', 'medium', 'low']),
             'size': f'{random.uniform(5, 105):.1f}',
-            'timestamp': (now - timedelta(minutes=i)).isoformat() + 'Z'
+            'timestamp': (now - timedelta(minutes=i)).isoformat()
         })
     return data
 
@@ -127,6 +152,13 @@ def get_audit_logs():
 
 # --- API Routes ---
 
+# NEW route to send publishable key to frontend
+@api_bp.route('/config')
+def get_config():
+    return jsonify({
+        'publishableKey': STRIPE_PUBLISHABLE_KEY
+    })
+
 # Dashboard Page
 @api_bp.route('/dashboard-data')
 def dashboard_data():
@@ -152,8 +184,12 @@ def ml_data():
 
 # Transactions Page
 @api_bp.route('/transactions')
-def transactions():
-    return jsonify(generate_transactions(30))
+def transactions_route():
+    # Return persisted transactions first, then fill with mock data
+    # This keeps our real transactions at the top of the list
+    mock_count = 30 - len(persisted_transactions)
+    mock_transactions = generate_transactions(mock_count) if mock_count > 0 else []
+    return jsonify(persisted_transactions + mock_transactions)
 
 # System Management Page
 @api_bp.route('/system-data')
@@ -182,7 +218,93 @@ def sync_device(device_id):
         'latency': random.uniform(10, 40),
         'load': random.uniform(10, 90),
         'transactionsPerSec': random.uniform(50, 250),
-        'lastSync': datetime.utcnow().isoformat() + 'Z',
+        'lastSync': datetime.now(timezone.utc).isoformat(),
         'syncStatus': 'synced'
     }
     return jsonify(synced_device)
+
+# --- NEW: Stripe Checkout Session Endpoint ---
+@api_bp.route('/create-checkout-session', methods=['POST'])
+def create_checkout_session():
+    data = request.get_json()
+    try:
+        amount_str = data.get('amount')
+        if not amount_str:
+            return jsonify({'error': 'Amount is required'}), 400
+
+        # Convert amount from RM (e.g., "10.50") to cents (e.g., 1050)
+        amount_in_cents = int(float(amount_str) * 100)
+
+        # Define success and cancel URLs
+        # We'll add parameters to tell our frontend what happened
+        base_url = request.host_url.rstrip('/')
+        success_url = f"{base_url}/transactions?status=success&session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url = f"{base_url}/transactions?status=cancel"
+
+        # Create a Checkout Session with Stripe
+        session = stripe.checkout.Session.create(
+            payment_method_types=[
+                'card',
+                'fpx',
+                'grabpay'
+            ],
+            line_items=[{
+                'price_data': {
+                    'currency': 'myr',
+                    'product_data': {
+                        'name': 'BankEdge Transfer',
+                        'description': data.get('reference', 'Demo Payment'),
+                    },
+                    'unit_amount': amount_in_cents,
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                'recipient_account': data.get('recipientAccount')
+            }
+        )
+
+        # Add a 'pending' transaction to our in-memory list
+        new_txn = {
+            'id': session.id, # Use the Stripe Session ID as the transaction ID
+            'amount': float(amount_str),
+            'type': 'Transfer',
+            'mlPrediction': 'pending',
+            'stripeStatus': 'processing',
+            'confidence': 1.0,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'deviceId': 'edge-13', # Placeholder
+            'processedAt': 'cloud',
+            'latency': random.uniform(70, 120),
+            'customerId': f'cus_demo_{random.randint(1000,9999)}',
+            'merchantName': data.get('recipientAccount', 'Stripe Payment')
+        }
+        persisted_transactions.insert(0, new_txn) # Add to top of the list
+
+        # Return the Session ID
+        return jsonify({'sessionId': session.id})
+
+    except stripe.error.StripeError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# NEW (Simulated) Webhook Endpoint
+@api_bp.route('/webhook/stripe', methods=['POST'])
+def stripe_webhook():
+    # This is a MOCK webhook. In a real app, Stripe would call this.
+    # For now, we'll simulate the "success" event
+    data = request.get_json()
+    session_id = data.get('session_id')
+
+    global persisted_transactions
+    for txn in persisted_transactions:
+        if txn['id'] == session_id:
+            txn['stripeStatus'] = 'succeeded'
+            txn['mlPrediction'] = 'approved'
+            break
+
+    return jsonify({'status': 'success'}), 200

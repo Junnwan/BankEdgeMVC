@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <!-- Chart.js library -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- NEW: Stripe.js library -->
+  <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
   <div class="dashboard-container">
@@ -58,6 +60,9 @@
       <div class="content-header">
         <h1 id="dashboard-title">{{ title }}</h1>
         <div class="header-right">
+          <button class="refresh-button" id="refresh-button" title="Refresh Data">
+              <i class="fas fa-sync-alt"></i> Refresh
+          </button>
           <div class="header-badges-container" id="header-badges">
             <!-- Badges will be injected by main.js -->
           </div>

@@ -5,7 +5,7 @@ function getLocationFromUsername(username, role) {
     }
     const match = username.match(/admin\.(\w+)@bankedge\.com/);
     if (match && match[1]) {
-        return match[1].charAt(0).toUpperCase() + match[1].slice(1);
+        return match[1].toUpperCase();
     }
     return null;
 }
@@ -91,6 +91,7 @@ function handleLogin(e) {
             sessionStorage.setItem('username', username);
             sessionStorage.setItem('role', determinedRole);
             sessionStorage.setItem('userLocation', getLocationFromUsername(username, determinedRole));
+            localStorage.removeItem('manualNodeOverrides');
             window.location.href = '/dashboard';
         } else {
             if (errorDescElement) errorDescElement.textContent = 'Invalid credentials. Please check your username and password.';
@@ -109,27 +110,9 @@ function handleLogout() {
     sessionStorage.removeItem('username');
     sessionStorage.removeItem('role');
     sessionStorage.removeItem('userLocation');
+    localStorage.removeItem('manualNodeOverrides');
     window.location.href = '/';
 }
-
-// --- Data Sync Function (for data_sync.html) ---
-function startSync() {
-    const statusElement = document.getElementById("sync-status");
-    const syncButton = document.querySelector('.btn-sync');
-    if (statusElement && syncButton) {
-        statusElement.textContent = "Synchronizing data... Please wait.";
-        statusElement.style.color = 'var(--teal-primary)';
-        syncButton.disabled = true;
-        syncButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
-        setTimeout(() => {
-            statusElement.innerHTML = '<i class="fas fa-check-circle"></i> Data synchronization completed successfully!';
-            statusElement.style.color = 'green';
-            syncButton.disabled = false;
-            syncButton.innerHTML = '<i class="fas fa-sync-alt"></i> Start Sync';
-        }, 3000);
-    }
-}
-
 
 // --- Dashboard Page Logic (/dashboard) ---
 let latencyLineChart = null;
@@ -169,9 +152,13 @@ function renderStatCards(devices, userLocation) {
     const totalTPS = devices.reduce((acc, d) => acc + d.transactionsPerSec, 0);
     const latencyReduction = avgLatency > 0 ? ((120 - avgLatency) / 120 * 100).toFixed(2) : '0.00';
     const mlAccuracy = 96.88;
-    const statusTitle = userLocation ? 'Edge Node Status' : 'Active Edge Nodes';
-    const statusValue = userLocation ? (onlineDevices > 0 ? 'Online' : 'Offline') : `${onlineDevices} / ${devices.length}`;
+
+    // --- FIX #1: Correctly use isFilteredView ---
+    const isFilteredView = (userLocation !== 'Global HQ');
+    const statusTitle = isFilteredView ? 'Edge Node Status' : 'Active Edge Nodes';
+    const statusValue = isFilteredView ? (onlineDevices > 0 ? 'Online' : 'Offline') : `${onlineDevices} / ${devices.length}`;
     const statusSubtitle = onlineDevices > 0 ? 'Operational' : 'Check Status';
+
     gridEl.innerHTML = `
         <div class="stat-card">
             <div class="stat-card-info">
@@ -261,11 +248,29 @@ function renderEdgeNodeCards(devices) {
     const titleEl = document.getElementById('edge-nodes-title');
     if (!gridEl || !titleEl) return;
     titleEl.textContent = devices.length === 1 ? 'Edge Node Details' : 'Edge Nodes Status';
-    gridEl.innerHTML = devices.map(device => {
+
+    const overrides = JSON.parse(sessionStorage.getItem('manualNodeOverrides') || '{}');
+    const processedDevices = devices.map(d => ({
+        ...d,
+        status: overrides[d.id] || d.status
+    }));
+
+    gridEl.innerHTML = processedDevices.map(device => {
         const load = device.load;
         let loadColorClass = 'low';
         if (load > 50) loadColorClass = 'medium';
         if (load > 80) loadColorClass = 'high';
+
+        // --- FIX #2b: Add power button logic here ---
+        const isOffline = device.status === 'offline';
+        const actionButton = isOffline
+            ? `<button class="power-button off" onclick="handleToggleNodeStatus('${device.id}', 'online')">
+                 <i class="fas fa-power-off"></i> Power On
+               </button>`
+            : `<button class="power-button on" onclick="handleToggleNodeStatus('${device.id}', 'offline')">
+                 <i class="fas fa-power-off"></i> Power Off
+               </button>`;
+
         return `
         <div class="node-card">
             <div class="node-card-header">
@@ -273,7 +278,7 @@ function renderEdgeNodeCards(devices) {
                     <h3>${device.name.replace('Edge Node ', '')}</h3>
                     <p>${device.location}</p>
                 </div>
-                <span class="node-status-badge ${device.status}">${device.status}</span>
+                <span class_badge ${device.status}">${device.status}</span>
             </div>
             <div class="node-card-body">
                 <div class="node-stat">
@@ -291,6 +296,10 @@ function renderEdgeNodeCards(devices) {
                 <div class="node-stat">
                     <div class="bar"><div class="bar-inner ${loadColorClass}" style="width: ${device.load}%;"></div></div>
                 </div>
+            </div>
+            <!-- FIX #2b: Add the footer with the button -->
+            <div class="device-card-footer" style="padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--border-color);">
+                ${actionButton}
             </div>
         </div>
         `;
@@ -329,28 +338,33 @@ async function initializeDashboard() {
     const role = sessionStorage.getItem('role');
     renderDashboardHeader(userLocation, role);
 
-    // Function to fetch and render
+    // FIX #3: No more interval, just a function
     async function fetchDashboardData() {
+        const overrides = JSON.parse(localStorage.getItem('manualNodeOverrides') || '{}');
         try {
             const res = await fetch('/api/dashboard-data');
             if (!res.ok) throw new Error('Failed to fetch dashboard data');
             const data = await res.json();
 
-            const allDevices = data.devices || [];
+            let allDevices = (data.devices || []).map(d => ({
+                ...d,
+                status: overrides[d.id] || d.status
+            }));
             const latencyData = data.latency || [];
             const allTransactions = data.transactions || [];
 
-            let devices = (role === 'admin' && userLocation !== 'Global HQ')
-                ? allDevices.filter(d => d.name === `Edge Node ${userLocation}`)
-                : allDevices;
+            let devices = (userLocation === 'Global HQ')
+                ? allDevices
+                : allDevices.filter(d => d.name === `Edge Node ${userLocation}`);
 
-            let recentTransactions = (role === 'admin' && userLocation !== 'Global HQ')
-                ? allTransactions.filter(t => {
+            let recentTransactions = (userLocation === 'Global HQ')
+                ? allTransactions
+                : allTransactions.filter(t => {
                     const device = allDevices.find(d => d.id === t.deviceId);
                     return device && device.name === `Edge Node ${userLocation}`;
-                }) : allTransactions;
+                });
 
-            renderStatCards(devices, (role === 'admin' && userLocation !== 'Global HQ') ? userLocation : null);
+            renderStatCards(devices, userLocation);
             renderLatencyChart(latencyData);
             renderLoadChart(devices);
             renderEdgeNodeCards(devices);
@@ -360,26 +374,14 @@ async function initializeDashboard() {
             console.error("Error fetching dashboard data:", error);
         }
     }
-
-    // Initial fetch
+    // Just call it once on load
     fetchDashboardData();
-
-    // Set up interval to refresh data
-    const dataInterval = setInterval(() => {
-        if (window.location.pathname !== '/dashboard') {
-            clearInterval(dataInterval);
-            if (latencyLineChart) { latencyLineChart.destroy(); latencyLineChart = null; }
-            if (loadBarChart) { loadBarChart.destroy(); loadBarChart = null; }
-            return;
-        }
-        fetchDashboardData();
-    }, 5000);
 }
-
 
 // --- Edge Devices Page Logic (/edge-devices) ---
 let edgePageDevices = [];
 let syncingDevices = new Set();
+let manualNodeOverrides = {};
 
 function renderEdgePageHeader(userLocation) {
     const titleEl = document.getElementById('edge-page-title');
@@ -439,6 +441,15 @@ function renderDeviceGridView(devices) {
         const loadClass = getLoadColorClass(device.load);
         const latencyClass = device.latency < 25 ? 'value-green' : 'value-yellow';
         const isSyncing = syncingDevices.has(device.id);
+        const isOffline = device.status === 'offline';
+
+        const actionButton = isOffline
+            ? `<button class="power-button off" onclick="handleToggleNodeStatus('${device.id}', 'online')">
+                 <i class="fas fa-power-off"></i> Power On
+               </button>`
+            : `<button class="power-button on" onclick="handleToggleNodeStatus('${device.id}', 'offline')">
+                 <i class="fas fa-power-off"></i> Power Off
+               </button>`;
 
         return `
         <div class="device-card-item">
@@ -454,7 +465,7 @@ function renderDeviceGridView(devices) {
                 </div>
                 <div class="device-card-status">
                     <div class="status-dot ${device.status}"></div>
-                    <span class="status-badge active">${device.status}</span>
+                    <span class="status-badge ${device.status === 'online' ? 'active' : 'inactive'}">${device.status}</span>
                 </div>
             </div>
             <div class="device-card-body">
@@ -477,8 +488,8 @@ function renderDeviceGridView(devices) {
                     <div>Last Sync <p><i class="fas fa-clock"></i> ${new Date(device.lastSync).toLocaleTimeString()}</p></div>
                 </div>
                 <div class="device-card-footer">
-                    <span class="sync-status-badge ${device.syncStatus}">${device.syncStatus}</span>
-                    <button class="sync-button" onclick="handleManualSync('${device.id}', '${device.name}')" ${isSyncing ? 'disabled' : ''}>
+                    ${actionButton}
+                    <button class="sync-button" onclick="handleManualSync('${device.id}', '${device.name}')" ${isSyncing || isOffline ? 'disabled' : ''}>
                         <i class="fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}"></i>
                         ${isSyncing ? 'Syncing...' : 'Sync'}
                     </button>
@@ -497,6 +508,15 @@ function renderDeviceTableView(devices) {
         const loadClass = getLoadColorClass(device.load);
         const latencyClass = device.latency < 25 ? 'value-green' : (device.latency < 40 ? 'value-yellow' : 'value-red');
         const isSyncing = syncingDevices.has(device.id);
+        const isOffline = device.status === 'offline';
+
+        const actionButton = isOffline
+            ? `<button class="power-button off" onclick="handleToggleNodeStatus('${device.id}', 'online')">
+                 <i class="fas fa-power-off"></i> On
+               </button>`
+            : `<button class="power-button on" onclick="handleToggleNodeStatus('${device.id}', 'offline')">
+                 <i class="fas fa-power-off"></i> Off
+               </button>`;
 
         return `
         <tr>
@@ -511,14 +531,27 @@ function renderDeviceTableView(devices) {
             <td>${device.transactionsPerSec.toFixed(2)}</td>
             <td>${new Date(device.lastSync).toLocaleTimeString()}</td>
             <td><span class="sync-status-badge ${device.syncStatus}">${device.syncStatus}</span></td>
-            <td>
-                <button class="sync-button" onclick="handleManualSync('${device.id}', '${device.name}')" ${isSyncing ? 'disabled' : ''}>
+            <td style="display: flex; gap: 8px;">
+                ${actionButton}
+                <button class="sync-button" onclick="handleManualSync('${device.id}', '${device.name}')" ${isSyncing || isOffline ? 'disabled' : ''}>
                     <i class="fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}"></i>
                 </button>
             </td>
         </tr>
         `;
     }).join('');
+}
+
+// FIX #2: New function to toggle node status
+function handleToggleNodeStatus(deviceId, newStatus) {
+    // Set the new status directly in the overrides
+    manualNodeOverrides[deviceId] = newStatus;
+
+    // Save to local storage
+    localStorage.setItem('manualNodeOverrides', JSON.stringify(manualNodeOverrides));
+
+    // Re-render the data for whatever page we are on
+    initializePageData();
 }
 
 async function handleManualSync(deviceId, deviceName) {
@@ -547,9 +580,14 @@ async function handleManualSync(deviceId, deviceName) {
 function renderEdgeDevicesPage() {
     const userLocation = sessionStorage.getItem('userLocation');
 
+    const processedDevices = edgePageDevices.map(d => ({
+        ...d,
+        status: manualNodeOverrides[d.id] || d.status
+    }));
+
     let devices = (userLocation === 'Global HQ')
-        ? edgePageDevices
-        : edgePageDevices.filter(d => d.name === `Edge Node ${userLocation}`);
+        ? processedDevices
+        : processedDevices.filter(d => d.name === `Edge Node ${userLocation}`);
 
     renderEdgePageHeader(userLocation);
     renderEdgeSummaryCards(devices);
@@ -558,40 +596,23 @@ function renderEdgeDevicesPage() {
 }
 
 async function initializeEdgeDevicesPage() {
+    manualNodeOverrides = JSON.parse(localStorage.getItem('manualNodeOverrides') || '{}');
+
     async function fetchEdgeData() {
         try {
             const res = await fetch('/api/devices');
             if (!res.ok) throw new Error('Failed to fetch devices');
             const allDevices = await res.json();
 
-            // Update only devices that are not currently syncing
-            edgePageDevices = allDevices.map(freshDevice => {
-                if (syncingDevices.has(freshDevice.id)) {
-                    // If syncing, keep the old version (which has the syncing state)
-                    return edgePageDevices.find(d => d.id === freshDevice.id);
-                }
-                return freshDevice; // Otherwise, use the fresh data
-            });
-
+            edgePageDevices = allDevices;
             renderEdgeDevicesPage();
         } catch (error) {
             console.error("Error fetching edge devices:", error);
         }
     }
 
-    // Initial fetch
     await fetchEdgeData();
-
-    // Set up interval for data refresh
-    const dataInterval = setInterval(() => {
-        if (window.location.pathname !== '/edge-devices') {
-            clearInterval(dataInterval);
-            return;
-        }
-        fetchEdgeData();
-    }, 15000); // 15 second refresh
 }
-
 
 // --- ML Insights Page Logic (/ml-insights) ---
 let mlMetricsChart = null;
@@ -878,14 +899,13 @@ function switchMLTab(tabName) {
 async function initializeMLPage() {
     const userLocation = sessionStorage.getItem('userLocation');
 
-    // We need all devices to map transactions, even on a specific user's page
     try {
         const devRes = await fetch('/api/devices');
         if (!devRes.ok) throw new Error('Failed to fetch devices');
         allDevicesData = await devRes.json();
     } catch (e) {
         console.error(e);
-        allDevicesData = []; // Fallback
+        allDevicesData = [];
     }
 
     renderMLHeader(userLocation);
@@ -900,6 +920,7 @@ async function initializeMLPage() {
             allMlTransactions = data.transactions || [];
             processingDecisionsData = data.decisions || [];
 
+            // FIX #1: Correct filtering
             let transactions = (userLocation === 'Global HQ')
                 ? allMlTransactions
                 : allMlTransactions.filter(t => {
@@ -920,29 +941,16 @@ async function initializeMLPage() {
         }
     }
 
-    // Initial fetch
     fetchMLData();
-
-    // Set up interval
-    const dataInterval = setInterval(() => {
-        if (window.location.pathname !== '/ml-insights') {
-            clearInterval(dataInterval);
-            if (mlMetricsChart) { mlMetricsChart.destroy(); mlMetricsChart = null; }
-            if (mlRadarChart) { mlRadarChart.destroy(); mlRadarChart = null; }
-            if (mlPredictionChart) { mlPredictionChart.destroy(); mlPredictionChart = null; }
-            return;
-        }
-        fetchMLData();
-    }, 10000); // 10 second refresh
 }
 
-
-// --- Transactions Page Logic (/transactions) ---
+// --- TRANSACTIONS PAGE LOGIC (HEAVILY UPDATED) ---
 let txnLocationChart = null;
 let txnStatusChart = null;
 let pageTransactions = [];
 let retryingTxns = new Set();
 let allTxnDevices = [];
+let stripe = null; // Stripe.js instance
 
 function switchTxnTab(tabName) {
     document.querySelectorAll('.tab-trigger').forEach(tab => tab.classList.remove('active'));
@@ -955,7 +963,6 @@ function renderTxnHeader(userLocation) {
     const titleEl = document.getElementById('txn-page-title');
     const subtitleEl = document.getElementById('txn-page-subtitle');
     if (!titleEl || !subtitleEl) return;
-
     if (userLocation === 'Global HQ') {
         titleEl.textContent = 'Transaction Processing';
         subtitleEl.textContent = 'Stripe payment integration with edge/cloud processing';
@@ -968,14 +975,12 @@ function renderTxnHeader(userLocation) {
 function renderTxnStatCards(transactions) {
     const gridEl = document.getElementById('txn-stat-cards');
     if (!gridEl) return;
-
     const totalVolume = transactions.reduce((acc, t) => acc + t.amount, 0);
     const successfulTxns = transactions.filter(t => t.stripeStatus === 'succeeded').length;
     const edgeProcessed = transactions.filter(t => t.processedAt === 'edge').length;
     const avgLatency = transactions.length > 0 ? (transactions.reduce((acc, t) => acc + t.latency, 0) / transactions.length).toFixed(0) : 0;
     const successRate = transactions.length > 0 ? (successfulTxns / transactions.length * 100).toFixed(1) : 0;
     const edgeRate = transactions.length > 0 ? (edgeProcessed / transactions.length * 100).toFixed(0) : 0;
-
     gridEl.innerHTML = `
         <div class="stat-card">
             <div class="stat-card-info">
@@ -1016,41 +1021,29 @@ function renderTxnLocationChart(transactions) {
     const ctxEl = document.getElementById('txn-location-chart');
     if (!ctxEl) return;
     const ctx = ctxEl.getContext('2d');
-
     const edge = transactions.filter(t => t.processedAt === 'edge');
     const cloud = transactions.filter(t => t.processedAt === 'cloud');
     const edgeAvg = edge.length > 0 ? (edge.reduce((acc, t) => acc + t.latency, 0) / edge.length).toFixed(0) : 0;
     const cloudAvg = cloud.length > 0 ? (cloud.reduce((acc, t) => acc + t.latency, 0) / cloud.length).toFixed(0) : 0;
-
-    document.getElementById('proc-edge-count').textContent = edge.length;
-    document.getElementById('proc-cloud-count').textContent = cloud.length;
-    document.getElementById('proc-edge-avg').textContent = `Avg ${edgeAvg}ms`;
-    document.getElementById('proc-cloud-avg').textContent = `Avg ${cloudAvg}ms`;
-
+    if(document.getElementById('proc-edge-count')) document.getElementById('proc-edge-count').textContent = edge.length;
+    if(document.getElementById('proc-cloud-count')) document.getElementById('proc-cloud-count').textContent = cloud.length;
+    if(document.getElementById('proc-edge-avg')) document.getElementById('proc-edge-avg').textContent = `Avg ${edgeAvg}ms`;
+    if(document.getElementById('proc-cloud-avg')) document.getElementById('proc-cloud-avg').textContent = `Avg ${cloudAvg}ms`;
     const data = [edge.length, cloud.length];
-
     if (txnLocationChart) {
         txnLocationChart.data.datasets[0].data = data;
         txnLocationChart.update();
         return;
     }
-
     txnLocationChart = new Chart(ctx, {
         type: 'pie',
         data: {
             labels: ['Edge Processed', 'Cloud Processed'],
-            datasets: [{
-                data: data,
-                backgroundColor: ['#10b981', '#3b82f6'],
-                borderWidth: 0
-            }]
+            datasets: [{ data: data, backgroundColor: ['#10b981', '#3b82f6'], borderWidth: 0 }]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom' },
-                tooltip: { callbacks: { label: context => `${context.label}: ${context.raw}` } }
-            }
+            plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: context => `${context.label}: ${context.raw}` } } }
         }
     });
 }
@@ -1059,34 +1052,24 @@ function renderTxnStatusChart(transactions) {
     const ctxEl = document.getElementById('txn-status-chart');
     if (!ctxEl) return;
     const ctx = ctxEl.getContext('2d');
-
     const succeeded = transactions.filter(t => t.stripeStatus === 'succeeded').length;
     const failed = transactions.filter(t => t.stripeStatus === 'failed').length;
     const processing = transactions.filter(t => t.stripeStatus === 'processing').length;
     const data = [succeeded, failed, processing];
-
     if (txnStatusChart) {
         txnStatusChart.data.datasets[0].data = data;
         txnStatusChart.update();
         return;
     }
-
     txnStatusChart = new Chart(ctx, {
         type: 'pie',
         data: {
             labels: ['Succeeded', 'Failed', 'Processing'],
-            datasets: [{
-                data: data,
-                backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
-                borderWidth: 0
-            }]
+            datasets: [{ data: data, backgroundColor: ['#10b981', '#ef4444', '#f59e0b'], borderWidth: 0 }]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom' },
-                tooltip: { callbacks: { label: context => `${context.label}: ${context.raw}` } }
-            }
+            plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: context => `${context.label}: ${context.raw}` } } }
         }
     });
 }
@@ -1094,19 +1077,16 @@ function renderTxnStatusChart(transactions) {
 function renderTxnTable(transactions) {
     const tableBodyEl = document.getElementById('txn-table-body');
     if (!tableBodyEl) return;
-
     tableBodyEl.innerHTML = transactions.slice(0, 10).map(txn => {
         const latencyClass = txn.latency < 30 ? 'value-green' : 'value-yellow';
         const isRetrying = retryingTxns.has(txn.id);
-
         let statusBadge;
         switch (txn.stripeStatus) {
-            case 'succeeded': statusBadge = '<span class="status-active">Succeeded</span>'; break;
+            case 'succeeded': statusBadge = '<span class.status-active">Succeeded</span>'; break;
             case 'failed': statusBadge = '<span class="status-error">Failed</span>'; break;
             case 'processing': statusBadge = '<span class="status-inactive" style="background-color: #fef9c3; color: #ca8a04;">Processing</span>'; break;
             default: statusBadge = `<span class="status-inactive">${txn.stripeStatus}</span>`;
         }
-
         return `
         <tr>
             <td style="font-size: 0.8rem; font-family: monospace;">${txn.id.slice(0, 16)}...</td>
@@ -1133,13 +1113,11 @@ function renderTxnTable(transactions) {
 function renderTxnPipeline(transactions) {
     const gridEl = document.getElementById('txn-pipeline-grid');
     if (!gridEl) return;
-
     const successfulTxns = transactions.filter(t => t.stripeStatus === 'succeeded').length;
     const validatedTxns = transactions.filter(t => t.mlPrediction !== 'pending').length;
     const processedTxns = transactions.filter(t => t.stripeStatus !== 'processing').length;
-
     gridEl.innerHTML = `
-        <div class="pipeline-step">
+        <div class.pipeline-step">
             <h4>${transactions.length}</h4>
             <p>Initiated</p>
         </div>
@@ -1164,7 +1142,6 @@ function renderTxnPipeline(transactions) {
 function handleRetryTransaction(txnId) {
     retryingTxns.add(txnId);
     renderTxnTable(pageTransactions); // Re-render table to show spinner
-
     setTimeout(() => {
         pageTransactions = pageTransactions.map(txn =>
             txn.id === txnId
@@ -1172,7 +1149,6 @@ function handleRetryTransaction(txnId) {
             : txn
         );
         retryingTxns.delete(txnId);
-        // Re-render all components on the page
         renderTxnStatCards(pageTransactions);
         renderTxnLocationChart(pageTransactions);
         renderTxnStatusChart(pageTransactions);
@@ -1182,51 +1158,130 @@ function handleRetryTransaction(txnId) {
     }, 1500);
 }
 
-function handleDemoTransaction(e) {
+// NEW: Stripe Checkout submit handler
+async function handleCheckoutSubmit(e) {
     e.preventDefault();
-    const btn = document.getElementById('demo-txn-btn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
-    const amountInput = document.getElementById('amount');
-    const recipientInput = document.getElementById('recipientAccount');
+    const submitBtn = document.getElementById('payment-submit-btn');
+    const messageEl = document.getElementById('payment-message');
 
-    const amount = parseFloat(amountInput.value);
-    const recipient = recipientInput.value;
+    // --- 1. Disable form and show loading ---
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    messageEl.textContent = 'Creating secure checkout session...';
+    messageEl.style.display = 'block';
+    messageEl.style.color = 'var(--muted-text)';
 
-    setTimeout(() => {
-        const newTxn = {
-            id: `txn-demo-${Date.now()}`,
-            type: 'Transfer',
-            amount: amount,
-            timestamp: new Date().toISOString(),
-            deviceId: 'edge-13', // Demo from Selangor
-            latency: Math.floor(Math.random() * 20) + 10,
-            mlPrediction: 'approved',
-            confidence: 0.95,
-            processedAt: 'edge',
-            stripeStatus: 'succeeded',
-            customerId: `cus_${Math.random().toString(36).substr(2, 14)}`,
-            merchantName: recipient || 'Demo Recipient'
-        };
+    const amount = document.getElementById('amount').value;
+    const recipientAccount = document.getElementById('recipientAccount').value;
+    const reference = document.getElementById('reference').value;
 
-        pageTransactions.pop(); // Remove oldest
-        pageTransactions = [newTxn, ...pageTransactions]; // Add newest
+    try {
+        // --- 2. Create Checkout Session on our backend ---
+        const res = await fetch('/api/create-checkout-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                amount: amount,
+                recipientAccount: recipientAccount,
+                reference: reference
+            })
+        });
 
-        // Re-render all components
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Server error');
+
+        const sessionId = data.sessionId;
+        messageEl.textContent = 'Session created. Redirecting to Stripe...';
+
+        // --- 3. Redirect to Stripe's hosted checkout page ---
+        const { error } = await stripe.redirectToCheckout({
+            sessionId: sessionId
+        });
+
+        if (error) {
+            throw new Error(error.message);
+        }
+
+    } catch (error) {
+        console.error('Checkout failed:', error);
+        messageEl.textContent = `Error: ${error.message}`;
+        messageEl.style.color = 'var(--red-light)';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-credit-card"></i> Proceed to Payment';
+    }
+}
+
+// Fetches all transaction data
+async function fetchTxnData() {
+    const userLocation = sessionStorage.getItem('userLocation');
+    try {
+        const res = await fetch('/api/transactions');
+        if (!res.ok) throw new Error('Failed to fetch transactions');
+        let allTransactions = await res.json(); // This now includes our persisted txns
+
+        // FIX #1: Correct filtering
+        pageTransactions = (userLocation === 'Global HQ')
+            ? allTransactions
+            : allTransactions.filter(t => {
+                const device = allTxnDevices.find(d => d.id === t.deviceId);
+                // Handle demo txns that might not have a device ID from the user's location
+                if (t.id.startsWith('txn-demo-') || t.id.startsWith('cs_test_')) return true;
+                return device && device.name === `Edge Node ${userLocation}`;
+            });
+
+        // Sort by timestamp to ensure newest are first (since we combined lists)
+        pageTransactions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
         renderTxnStatCards(pageTransactions);
         renderTxnLocationChart(pageTransactions);
         renderTxnStatusChart(pageTransactions);
         renderTxnTable(pageTransactions);
         renderTxnPipeline(pageTransactions);
 
-        // Reset form
-        document.getElementById('demo-txn-form').reset();
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-credit-card"></i> Process Demo Transaction';
+    } catch (error) {
+        console.error("Error fetching transactions:", error);
+    }
+}
 
-        console.log("Demo transaction processed!");
-    }, 2000);
+// NEW: Function to check for query params on page load
+async function checkTransactionStatus() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('status');
+    const sessionId = urlParams.get('session_id');
+    const messageEl = document.getElementById('payment-message');
+    if (!messageEl) return;
+
+    if (status === 'success') {
+        messageEl.innerHTML = '<i class="fas fa-check-circle"></i> Payment successful! Your transaction has been recorded.';
+        messageEl.style.color = 'var(--status-active-text)';
+        messageEl.style.borderColor = 'var(--status-active-bg)';
+        messageEl.style.backgroundColor = 'var(--status-active-bg)';
+        messageEl.style.display = 'flex';
+
+        // --- NEW: Tell backend to update the transaction status ---
+        // This simulates the webhook
+        if (sessionId) {
+            try {
+                await fetch('/api/webhook/stripe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+            } catch (e) {
+                console.error("Failed to simulate webhook", e);
+            }
+        }
+
+    } else if (status === 'cancel') {
+        messageEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Payment canceled. You have not been charged.';
+        messageEl.style.color = 'var(--status-error-text)';
+        messageEl.style.borderColor = 'var(--status-error-bg)';
+        messageEl.style.backgroundColor = 'var(--status-error-bg)';
+        messageEl.style.display = 'flex';
+    }
+
+    window.history.replaceState(null, '', window.location.pathname);
 }
 
 async function initializeTransactionsPage() {
@@ -1236,45 +1291,33 @@ async function initializeTransactionsPage() {
         const devRes = await fetch('/api/devices');
         if (!devRes.ok) throw new Error('Failed to fetch devices');
         allTxnDevices = await devRes.json();
-    } catch (e) {
-        console.error(e);
-        allTxnDevices = [];
-    }
+    } catch (e) { console.error(e); allTxnDevices = []; }
 
     renderTxnHeader(userLocation);
+    await checkTransactionStatus(); // Wait for this to finish
+    await fetchTxnData(); // Then fetch data
 
-    async function fetchTxnData() {
-        try {
-            const res = await fetch('/api/transactions');
-            if (!res.ok) throw new Error('Failed to fetch transactions');
-            const allTransactions = await res.json();
-
-            pageTransactions = (userLocation === 'Global HQ')
-                ? allTransactions
-                : allTransactions.filter(t => {
-                    const device = allTxnDevices.find(d => d.id === t.deviceId);
-                    return device && device.name === `Edge Node ${userLocation}`;
-                });
-
-            renderTxnStatCards(pageTransactions);
-            renderTxnLocationChart(pageTransactions);
-            renderTxnStatusChart(pageTransactions);
-            renderTxnTable(pageTransactions);
-            renderTxnPipeline(pageTransactions);
-
-        } catch (error) {
-            console.error("Error fetching transactions:", error);
+    try {
+        const configRes = await fetch('/api/config');
+        const config = await configRes.json();
+        const publishableKey = config.publishableKey;
+        if (!publishableKey || !publishableKey.startsWith('pk_test_')) {
+            throw new Error("Invalid Stripe Publishable Key. Make sure it's set in api_controller.py");
+        }
+        stripe = Stripe(publishableKey);
+        const form = document.getElementById('payment-form');
+        if (form) {
+            form.addEventListener('submit', handleCheckoutSubmit);
+        }
+    } catch (error) {
+        console.error("Failed to initialize Stripe:", error);
+        const messageEl = document.getElementById('payment-message');
+        if (messageEl) {
+            messageEl.textContent = 'Error: Failed to load payment form. Check Stripe keys.';
+            messageEl.style.display = 'block';
         }
     }
 
-    // Initial fetch
-    await fetchTxnData();
-
-    // Add form listener
-    const demoForm = document.getElementById('demo-txn-form');
-    if (demoForm) {
-        demoForm.addEventListener('submit', handleDemoTransaction);
-    }
     const recipientInput = document.getElementById('recipientAccount');
     if (recipientInput) {
         recipientInput.addEventListener('input', (e) => {
@@ -1282,18 +1325,8 @@ async function initializeTransactionsPage() {
         });
     }
 
-    // Set up interval
-    const dataInterval = setInterval(() => {
-        if (window.location.pathname !== '/transactions') {
-            clearInterval(dataInterval);
-            if (txnLocationChart) { txnLocationChart.destroy(); txnLocationChart = null; }
-            if (txnStatusChart) { txnStatusChart.destroy(); txnStatusChart = null; }
-            return;
-        }
-        fetchTxnData();
-    }, 8000); // 8 second refresh
+    // Auto-refresh interval is REMOVED.
 }
-
 
 // --- System Management Page Logic (/system-management) ---
 let sysAdmins = [];
@@ -1509,6 +1542,22 @@ async function initializeSystemManagementPage() {
 
 
 // --- Main Initialization Logic (DOMContentLoaded) ---
+function initializePageData() {
+    const currentPath = window.location.pathname;
+
+    if (currentPath === '/dashboard') {
+        initializeDashboard();
+    } else if (currentPath === '/edge-devices') {
+        initializeEdgeDevicesPage();
+    } else if (currentPath === '/ml-insights') {
+        initializeMLPage();
+    } else if (currentPath.startsWith('/transactions')) {
+        // Transactions page handles its own loading due to Stripe
+    } else if (currentPath === '/system-management') {
+        initializeSystemManagementPage();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- 1. Authentication and Page Protection ---
@@ -1568,19 +1617,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 5. Page-Specific Initialization ---
-    if (currentPath === '/dashboard') {
-        initializeDashboard();
-    } else if (currentPath === '/edge-devices') {
-        initializeEdgeDevicesPage();
-    } else if (currentPath === '/ml-insights') {
-        initializeMLPage();
-    } else if (currentPath === '/transactions') {
+    if (currentPath.startsWith('/transactions')) {
         initializeTransactionsPage();
-    } else if (currentPath === '/system-management') {
-        if (userRole !== 'superadmin') {
-            window.location.href = '/dashboard'; // Redirect non-admins
-            return;
-        }
-        initializeSystemManagementPage();
+    } else {
+        initializePageData();
+    }
+
+    // FIX #3: Add listener for new refresh button
+    const refreshButton = document.getElementById('refresh-button');
+    if (refreshButton) {
+        refreshButton.addEventListener('click', () => {
+            const icon = refreshButton.querySelector('i');
+            icon.classList.add('fa-spin'); // Add spin animation
+            // Call the correct loader based on the page
+            if (currentPath.startsWith('/transactions')) {
+                fetchTxnData();
+            } else {
+                initializePageData();
+            }
+            // Remove spin after 1s
+            setTimeout(() => {
+                icon.classList.remove('fa-spin');
+            }, 1000);
+        });
     }
 });
