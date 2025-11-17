@@ -1,44 +1,58 @@
+# This is the full content for app.py
+
+import os
 from flask import Flask, render_template
-from controllers.api_controller import api_bp # <-- ONLY blueprint we need
+from controllers.api_controller import api_bp
+from extensions import db, bcrypt  # <-- NEW: Import extensions
+from models import User, Device, Transaction  # <-- NEW: Import models
 
 app = Flask(__name__)
 
-# Register Blueprints (controllers)
-app.register_blueprint(api_bp) # <-- API is registered
+# --- NEW: Database Configuration ---
+basedir = os.path.abspath(os.path.dirname(__file__))
+# This configures a simple SQLite database file named 'bankedge.db' in your project root
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'bankedge.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# --- Public Route ---
+# --- NEW: Initialize Extensions ---
+db.init_app(app)
+bcrypt.init_app(app)
+
+# Register Blueprints
+app.register_blueprint(api_bp)
+
+# --- Routes ---
 @app.route('/')
 def login():
-    """
-    Serves the login page.
-    """
     return render_template('login.html')
 
-# --- Protected Dashboard Routes ---
 @app.route('/dashboard')
 def dashboard():
-    """Serves the main dashboard page (index.html)."""
     return render_template('index.html', title='Dashboard')
 
 @app.route('/edge-devices')
 def edge_devices_route():
-    """Serves the Edge Devices page."""
     return render_template('edge_devices.html', title='Edge Devices')
 
 @app.route('/ml-insights')
 def ml_insights():
-    """Serves the ML Insights page."""
     return render_template('ml_insights.html', title='ML Insights')
 
 @app.route('/transactions')
 def transactions():
-    """Serves the Transactions page."""
     return render_template('transactions.html', title='Transaction Processing')
 
 @app.route('/system-management')
 def system_management():
-    """Serves the System Management page."""
     return render_template('system_management.html', title='System Management')
+
+# --- NEW: Create database tables ---
+# This block checks if the bankedge.db file exists. If not, it creates it.
+with app.app_context():
+    if not os.path.exists(os.path.join(basedir, 'bankedge.db')):
+        print("Creating database tables...")
+        db.create_all()
+        print("Database created.")
 
 if __name__ == '__main__':
     app.run(debug=True)

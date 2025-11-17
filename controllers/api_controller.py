@@ -11,6 +11,9 @@ except AttributeError:
     # Old versions (v5 and below)
     StripeError = stripe.StripeError
 
+from extensions import db, bcrypt
+from models import User, Device, Transaction
+
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 # --- NEW: Stripe API Key Configuration ---
@@ -20,8 +23,8 @@ api_bp = Blueprint('api', __name__, url_prefix='/api')
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
 
-# --- In-Memory Database ---
-persisted_transactions = []
+# # --- In-Memory Database ---
+# persisted_transactions = []
 
 # --- Data Generation Logic (Translated to Python) ---
 
@@ -149,6 +152,9 @@ def get_audit_logs():
         {'id': 'log_004', 'timestamp': '2025-10-28T09:58:23Z', 'user': 'superadmin@bankedge.com', 'action': 'CREATE_ADMIN', 'resource': 'User: admin.johor@bankedge.com', 'status': 'success', 'ipAddress': '203.106.94.23'},
         {'id': 'log_005', 'timestamp': '2025-10-28T09:45:12Z', 'user': 'admin.kl@bankedge.com', 'action': 'FAILED_LOGIN', 'resource': 'Authentication', 'status': 'failed', 'ipAddress': '118.107.46.89'}
     ]
+
+# --- In-Memory Database (to fix "fake data" problem) ---
+persisted_transactions = []
 
 # --- API Routes ---
 
@@ -308,3 +314,70 @@ def stripe_webhook():
             break
 
     return jsonify({'status': 'success'}), 200
+
+@api_bp.route('/init-db', methods=['GET'])
+def init_db():
+    try:
+        # Drop all existing tables (for a clean start) and create new ones
+        db.drop_all()
+        db.create_all()
+
+        # --- Create Users ---
+        # Create SuperAdmin
+        superadmin = User(username='superadmin@bankedge.com', role='superadmin')
+        superadmin.set_password('SuperAdmin@123')
+        db.session.add(superadmin)
+
+        # Create all Edge Admins
+        all_admin_usernames = [
+            'admin.johor@bankedge.com', 'admin.kedah@bankedge.com', 'admin.kelantan@bankedge.com',
+            'admin.malacca@bankedge.com', 'admin.negerisembilan@bankedge.com', 'admin.pahang@bankedge.com',
+            'admin.penang@bankedge.com', 'admin.perak@bankedge.com', 'admin.perlis@bankedge.com',
+            'admin.sabah@bankedge.com', 'admin.sarawak@bankedge.com', 'admin.selangor@bankedge.com',
+            'admin.terengganu@bankedge.com', 'admin.kl@bankedge.com', 'admin.labuan@bankedge.com',
+            'admin.putrajaya@bankedge.com'
+        ]
+
+        for username in all_admin_usernames:
+            admin = User(username=username, role='admin')
+            admin.set_password('Admin@123')
+            db.session.add(admin)
+
+        # --- Create Devices ---
+        devices_data = generate_edge_devices() # Use our mock generator
+        for dev_data in devices_data:
+            device = Device(
+                id=dev_data['id'],
+                name=dev_data['name'],
+                location=dev_data['location'],
+                status=dev_data['status'],
+                region=dev_data['region']
+            )
+            db.session.add(device)
+
+        # --- Create Transactions ---
+        transactions_data = generate_transactions(50) # Add 50 mock transactions
+        for txn_data in transactions_data:
+            # Find the matching device in the session (this will work because we added them first)
+            device = db.session.get(Device, txn_data['deviceId'])
+            if device:
+                txn = Transaction(
+                    id=txn_data['id'],
+                    amount=txn_data['amount'],
+                    stripe_status=txn_data['stripeStatus'],
+                    ml_prediction=txn_data['mlPrediction'],
+                    processed_at=txn_data['processedAt'],
+                    timestamp=datetime.fromisoformat(txn_data['timestamp']),
+                    merchant_name=txn_data['merchantName'],
+                    device_id=device.id # Link to the device
+                )
+                db.session.add(txn)
+
+        # Commit all changes
+        db.session.commit()
+
+        return jsonify({'message': 'Database initialized and seeded successfully!'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
