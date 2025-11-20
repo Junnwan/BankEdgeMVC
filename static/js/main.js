@@ -98,6 +98,78 @@ function handleLogout() {
 let latencyLineChart = null;
 let loadBarChart = null;
 
+async function fetchDashboardData() {
+    const userLocation = sessionStorage.getItem('userLocation');
+    const token = getAuthToken();
+
+    // We remove overrides here because the API is the source of truth
+    try {
+        const res = await fetch('/api/dashboard-data', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!res.ok) {
+            if (res.status === 401) {
+                handleLogout(); // Auto-logout if token invalid
+                return;
+            }
+            throw new Error('Failed to fetch dashboard data');
+        }
+
+        const data = await res.json();
+
+        // Use API data directly
+        let allDevices = data.devices || [];
+        const latencyData = data.latency || [];
+        const allTransactions = data.transactions || [];
+
+        // Filter for Dashboard
+        let devices = (userLocation === 'Global HQ')
+            ? allDevices
+            : allDevices.filter(d => d.name === `Edge Node ${userLocation}`);
+
+        let recentTransactions = (userLocation === 'Global HQ')
+            ? allTransactions
+            : allTransactions.filter(t => {
+                const device = allDevices.find(d => d.id === t.deviceId);
+                return device && device.name === `Edge Node ${userLocation}`;
+            });
+
+        renderStatCards(devices, userLocation);
+        renderLatencyChart(latencyData);
+        renderLoadChart(devices);
+        renderEdgeNodeCards(devices); // This renders the power buttons
+        renderTransactions(recentTransactions, allDevices);
+
+    } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+    }
+}
+
+async function initializeDashboard() {
+    const userLocation = sessionStorage.getItem('userLocation');
+    const role = sessionStorage.getItem('role');
+
+    renderDashboardHeader(userLocation, role);
+
+    // Initial fetch
+    await fetchDashboardData();
+
+    // Refresh interval
+    const dataInterval = setInterval(() => {
+        if (window.location.pathname !== '/dashboard') {
+            clearInterval(dataInterval);
+            if (latencyLineChart) { latencyLineChart.destroy(); latencyLineChart = null; }
+            if (loadBarChart) { loadBarChart.destroy(); loadBarChart = null; }
+            return;
+        }
+        fetchDashboardData();
+    }, 5000);
+}
+
 function renderDashboardHeader(userLocation, role) {
     const titleEl = document.getElementById('dashboard-title');
     const badgesEl = document.getElementById('header-badges');
@@ -108,7 +180,7 @@ function renderDashboardHeader(userLocation, role) {
             titleEl.textContent = 'Global Dashboard';
             badgesEl.innerHTML = `
                 <div class="header-badge"><i class="fas fa-server"></i> 16 Edge Nodes</div>
-                <div class="header-badge"><i class="fas fa-map-pin"></i> Malaysia (13 States + 3 Federal Territories)</div>
+                <div class="header-badge"><i class="fas fa-map-pin"></i> Malaysia</div>
             `;
         } else {
             titleEl.textContent = `Dashboard - ${userLocation}`;
@@ -129,11 +201,10 @@ function renderStatCards(devices, userLocation) {
     if (!gridEl) return;
     const onlineDevices = devices.filter(d => d.status === 'online').length;
     const avgLatency = devices.length > 0 ? devices.reduce((acc, d) => acc + d.latency, 0) / devices.length : 0;
-    const totalTPS = devices.reduce((acc, d) => acc + d.transactionsPerSec, 0);
+    const totalTPS = devices.reduce((acc, d) => acc + d.transactionsPerSec, 0) / (devices.length || 1);
     const latencyReduction = avgLatency > 0 ? ((120 - avgLatency) / 120 * 100).toFixed(2) : '0.00';
     const mlAccuracy = 96.88;
 
-    // --- FIX #1: Correctly use isFilteredView ---
     const isFilteredView = (userLocation !== 'Global HQ');
     const statusTitle = isFilteredView ? 'Edge Node Status' : 'Active Edge Nodes';
     const statusValue = isFilteredView ? (onlineDevices > 0 ? 'Online' : 'Offline') : `${onlineDevices} / ${devices.length}`;
@@ -229,10 +300,7 @@ function renderEdgeNodeCards(devices) {
     if (!gridEl || !titleEl) return;
     titleEl.textContent = devices.length === 1 ? 'Edge Node Details' : 'Edge Nodes Status';
 
-    // No more overrides, just use the data from the API
-    const processedDevices = devices;
-
-    gridEl.innerHTML = processedDevices.map(device => {
+    gridEl.innerHTML = devices.map(device => {
         const load = device.load;
         let loadColorClass = 'low';
         if (load > 50) loadColorClass = 'medium';
@@ -249,7 +317,7 @@ function renderEdgeNodeCards(devices) {
 
         return `
         <div class="node-card">
-            <div class="node-card-header">
+            <div class="node-card-header" style="align-items: flex-start;">
                 <div>
                     <h3>${device.name.replace('Edge Node ', '')}</h3>
                     <p>${device.location}</p>
@@ -308,51 +376,6 @@ function renderTransactions(transactions, allDevices) {
     }).join('');
 }
 
-async function initializeDashboard() {
-    const userLocation = sessionStorage.getItem('userLocation');
-    const role = sessionStorage.getItem('role');
-    renderDashboardHeader(userLocation, role);
-
-    // FIX #3: No more interval, just a function
-    async function fetchDashboardData() {
-        const overrides = JSON.parse(localStorage.getItem('manualNodeOverrides') || '{}');
-        try {
-            const res = await fetch('/api/dashboard-data');
-            if (!res.ok) throw new Error('Failed to fetch dashboard data');
-            const data = await res.json();
-
-            let allDevices = (data.devices || []).map(d => ({
-                ...d,
-                status: overrides[d.id] || d.status
-            }));
-            const latencyData = data.latency || [];
-            const allTransactions = data.transactions || [];
-
-            let devices = (userLocation === 'Global HQ')
-                ? allDevices
-                : allDevices.filter(d => d.name === `Edge Node ${userLocation}`);
-
-            let recentTransactions = (userLocation === 'Global HQ')
-                ? allTransactions
-                : allTransactions.filter(t => {
-                    const device = allDevices.find(d => d.id === t.deviceId);
-                    return device && device.name === `Edge Node ${userLocation}`;
-                });
-
-            renderStatCards(devices, userLocation);
-            renderLatencyChart(latencyData);
-            renderLoadChart(devices);
-            renderEdgeNodeCards(devices);
-            renderTransactions(recentTransactions, allDevices);
-
-        } catch (error) {
-            console.error("Error fetching dashboard data:", error);
-        }
-    }
-    // Just call it once on load
-    fetchDashboardData();
-}
-
 // --- Edge Devices Page Logic (/edge-devices) ---
 let edgePageDevices = [];
 let syncingDevices = new Set();
@@ -367,6 +390,36 @@ function renderEdgePageHeader(userLocation) {
     } else {
         titleEl.textContent = `Edge Device Management - ${userLocation}`;
         subtitleEl.textContent = `Monitor and manage the ${userLocation} edge node`;
+    }
+}
+
+async function fetchEdgePageData() {
+    const userLocation = sessionStorage.getItem('userLocation');
+    const token = getAuthToken();
+
+    try {
+        const res = await fetch('/api/devices', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+            if (res.status === 401) { handleLogout(); return; }
+            throw new Error('Failed to fetch devices');
+        }
+        const allDevices = await res.json();
+
+        edgePageDevices = allDevices;
+
+        let devices = (userLocation === 'Global HQ')
+            ? edgePageDevices
+            : edgePageDevices.filter(d => d.name === `Edge Node ${userLocation}`);
+
+        renderEdgePageHeader(userLocation);
+        renderEdgeSummaryCards(devices);
+        renderDeviceGridView(devices);
+        renderDeviceTableView(devices);
+
+    } catch (error) {
+        console.error("Error fetching edge devices:", error);
     }
 }
 
@@ -418,10 +471,10 @@ function renderDeviceGridView(devices) {
         const isOffline = device.status === 'offline';
 
         const actionButton = isOffline
-            ? `<button class="power-button off" onclick="handleToggleNodeStatus('${device.id}', 'online')">
+            ? `<button class="power-button off" onclick="handleToggleNodeStatus('${device.id}')">
                  <i class="fas fa-power-off"></i> Power On
                </button>`
-            : `<button class="power-button on" onclick="handleToggleNodeStatus('${device.id}', 'offline')">
+            : `<button class="power-button on" onclick="handleToggleNodeStatus('${device.id}')">
                  <i class="fas fa-power-off"></i> Power Off
                </button>`;
 
@@ -462,11 +515,15 @@ function renderDeviceGridView(devices) {
                     <div>Last Sync <p><i class="fas fa-clock"></i> ${new Date(device.lastSync).toLocaleTimeString()}</p></div>
                 </div>
                 <div class="device-card-footer">
-                    ${actionButton}
-                    <button class="sync-button" onclick="handleManualSync('${device.id}', '${device.name}')" ${isSyncing || isOffline ? 'disabled' : ''}>
-                        <i class="fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}"></i>
-                        ${isSyncing ? 'Syncing...' : 'Sync'}
-                    </button>
+                    <span class="sync-status-badge ${device.syncStatus}">${device.syncStatus}</span>
+                    ${isOffline
+                        ? actionButton
+                        : `<button class="sync-button" onclick="handleManualSync('${device.id}', '${device.name}')" ${isSyncing ? 'disabled' : ''}>
+                             <i class="fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}"></i>
+                             ${isSyncing ? 'Syncing...' : 'Sync'}
+                           </button>
+                           ${actionButton}`
+                    }
                 </div>
             </div>
         </div>
@@ -485,10 +542,10 @@ function renderDeviceTableView(devices) {
         const isOffline = device.status === 'offline';
 
         const actionButton = isOffline
-            ? `<button class="power-button off" onclick="handleToggleNodeStatus('${device.id}', 'online')">
+            ? `<button class="power-button off" onclick="handleToggleNodeStatus('${device.id}')">
                  <i class="fas fa-power-off"></i> On
                </button>`
-            : `<button class="power-button on" onclick="handleToggleNodeStatus('${device.id}', 'offline')">
+            : `<button class="power-button on" onclick="handleToggleNodeStatus('${device.id}')">
                  <i class="fas fa-power-off"></i> Off
                </button>`;
 
@@ -529,24 +586,30 @@ async function handleToggleNodeStatus(deviceId) {
             throw new Error(err.error || 'Failed to toggle status');
         }
 
-        const updatedDevice = await res.json();
-
-        // Find and update the device in our local list to re-render immediately
-        edgePageDevices = edgePageDevices.map(d =>
-            d.id === updatedDevice.id ? { ...d, status: updatedDevice.status } : d
-        );
-        renderEdgeDevicesPage();
+        // Success! Now REFRESH the data for the current page immediately
+        // Because fetchDashboardData is global, this will now work!
+        if (window.location.pathname === '/dashboard') {
+            await fetchDashboardData();
+        } else if (window.location.pathname === '/edge-devices') {
+            await fetchEdgePageData();
+        } else {
+            location.reload(); // Fallback
+        }
 
     } catch (error) {
         console.error(`Error toggling status for ${deviceId}:`, error);
-        alert(`Error: ${error.message}`); // Show alert for permission errors
+        alert(`Error: ${error.message}`);
     }
 }
 
 async function handleManualSync(deviceId, deviceName) {
-    const token = getAuthToken();
+    const token = sessionStorage.getItem('authToken');
     syncingDevices.add(deviceId);
-    renderEdgeDevicesPage();
+
+    const userLocation = sessionStorage.getItem('userLocation');
+    let devices = (userLocation === 'Global HQ') ? edgePageDevices : edgePageDevices.filter(d => d.name === `Edge Node ${userLocation}`);
+    renderDeviceGridView(devices);
+    renderDeviceTableView(devices);
 
     try {
         const res = await fetch(`/api/devices/sync/${deviceId}`, {
@@ -556,13 +619,8 @@ async function handleManualSync(deviceId, deviceName) {
         if (!res.ok) throw new Error('Sync failed');
         const syncedDevice = await res.json();
 
-        // Merge the new sync data with the persistent status from the DB
-        const currentDevice = edgePageDevices.find(d => d.id === deviceId);
-
         edgePageDevices = edgePageDevices.map(device =>
-            device.id === deviceId
-            ? { ...syncedDevice, status: currentDevice.status } // Keep the persistent status
-            : device
+            device.id === deviceId ? syncedDevice : device
         );
 
         console.log(`${deviceName} synchronized successfully`);
@@ -570,7 +628,9 @@ async function handleManualSync(deviceId, deviceName) {
         console.error(`Error syncing ${deviceName}:`, error);
     } finally {
         syncingDevices.delete(deviceId);
-        renderEdgeDevicesPage();
+        let devices = (userLocation === 'Global HQ') ? edgePageDevices : edgePageDevices.filter(d => d.name === `Edge Node ${userLocation}`);
+        renderDeviceGridView(devices);
+        renderDeviceTableView(devices);
     }
 }
 
@@ -591,24 +651,17 @@ function renderEdgeDevicesPage() {
 }
 
 async function initializeEdgeDevicesPage() {
-    const token = getAuthToken();
+    await fetchEdgePageData();
 
-    async function fetchEdgeData() {
-        try {
-            const res = await fetch('/api/devices', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!res.ok) throw new Error('Failed to fetch devices');
-            const allDevices = await res.json();
-
-            edgePageDevices = allDevices;
-            renderEdgeDevicesPage();
-        } catch (error) {
-            console.error("Error fetching edge devices:", error);
+    const dataInterval = setInterval(() => {
+        if (window.location.pathname !== '/edge-devices') {
+            clearInterval(dataInterval);
+            return;
         }
-    }
-
-    await fetchEdgeData();
+        if (syncingDevices.size === 0) {
+            fetchEdgePageData();
+        }
+    }, 15000);
 }
 
 // --- ML Insights Page Logic (/ml-insights) ---
@@ -895,25 +948,21 @@ function switchMLTab(tabName) {
 
 async function initializeMLPage() {
     const userLocation = sessionStorage.getItem('userLocation');
-    const token = getAuthToken(); // Get token
+    const token = sessionStorage.getItem('authToken');
 
     try {
         const devRes = await fetch('/api/devices', {
-             headers: { 'Authorization': `Bearer ${token}` } // Send token
+             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!devRes.ok) throw new Error('Failed to fetch devices');
-        allDevicesData = await devRes.json();
-    } catch (e) {
-        console.error(e);
-        allDevicesData = [];
-    }
+        if (devRes.ok) allDevicesData = await devRes.json();
+    } catch (e) { allDevicesData = []; }
 
     renderMLHeader(userLocation);
 
     async function fetchMLData() {
-        try {
+         try {
             const res = await fetch('/api/ml-data', {
-                 headers: { 'Authorization': `Bearer ${token}` } // Send token
+                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!res.ok) throw new Error('Failed to fetch ML data');
             const data = await res.json();
@@ -941,8 +990,18 @@ async function initializeMLPage() {
             console.error("Error fetching ML data:", error);
         }
     }
-
     fetchMLData();
+
+    const dataInterval = setInterval(() => {
+        if (window.location.pathname !== '/ml-insights') {
+            clearInterval(dataInterval);
+            if (mlMetricsChart) { mlMetricsChart.destroy(); mlMetricsChart = null; }
+            if (mlRadarChart) { mlRadarChart.destroy(); mlRadarChart = null; }
+            if (mlPredictionChart) { mlPredictionChart.destroy(); mlPredictionChart = null; }
+            return;
+        }
+        fetchMLData();
+    }, 10000);
 }
 
 // --- TRANSACTIONS PAGE LOGIC (HEAVILY UPDATED) ---
@@ -1563,15 +1622,13 @@ function initializePageData() {
     } else if (currentPath === '/ml-insights') {
         initializeMLPage();
     } else if (currentPath.startsWith('/transactions')) {
-        // Transactions page handles its own loading due to Stripe
+        initializeTransactionsPage();
     } else if (currentPath === '/system-management') {
         initializeSystemManagementPage();
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-
-    // --- 1. Authentication and Page Protection ---
     const currentPath = window.location.pathname;
     const isAuthenticated = sessionStorage.getItem('authToken') !== null;
     const userRole = sessionStorage.getItem('role');
@@ -1589,7 +1646,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // --- 2. Dark Mode Logic ---
+    // --- Dark Mode Logic ---
     const toggle = document.getElementById('dark-mode-toggle');
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
@@ -1608,7 +1665,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- 3. Inject User Info into Header ---
+    // --- Inject User Info ---
     const userInfoElement = document.getElementById('user-info');
     if (userInfoElement) {
         const username = sessionStorage.getItem('username');
@@ -1619,7 +1676,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    // --- 4. Show/Hide Admin Link based on Role ---
+    // --- Show/Hide Admin Link ---
     if (userRole === 'superadmin') {
         const sysMgmtLink = document.getElementById('nav-system-management');
         if (sysMgmtLink) {
@@ -1627,26 +1684,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 5. Page-Specific Initialization ---
+    // --- Page Initialization ---
     if (currentPath.startsWith('/transactions')) {
         initializeTransactionsPage();
     } else {
         initializePageData();
     }
 
-    // FIX #3: Add listener for new refresh button
+    // --- Refresh Button ---
     const refreshButton = document.getElementById('refresh-button');
     if (refreshButton) {
         refreshButton.addEventListener('click', () => {
             const icon = refreshButton.querySelector('i');
-            icon.classList.add('fa-spin'); // Add spin animation
-            // Call the correct loader based on the page
+            icon.classList.add('fa-spin');
+
             if (currentPath.startsWith('/transactions')) {
-                fetchTxnData();
+                // Need to define this fetcher globally or access it
+                // Since we omitted it above, assume it's available or re-init
+                // For robustness, initializePageData handles everything except txn special case
+                // Let's just reload the page logic
+                 location.reload();
             } else {
                 initializePageData();
             }
-            // Remove spin after 1s
+
             setTimeout(() => {
                 icon.classList.remove('fa-spin');
             }, 1000);

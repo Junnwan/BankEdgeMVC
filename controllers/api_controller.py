@@ -461,9 +461,16 @@ def toggle_device_status(device_id):
     role = claims.get('role')
     user_location = claims.get('userLocation')
 
-    # Check if user is SuperAdmin OR if they are an Admin for this specific device
-    if role != 'superadmin' and user_location != device.location.upper():
-        return jsonify({"error": "Forbidden"}), 403
+    # FIX: Allow partial match (e.g., "KL" is in "KL, Malaysia")
+    # This allows Admin KL to toggle their own node.
+    is_authorized = False
+    if role == 'superadmin':
+        is_authorized = True
+    elif user_location and user_location in device.location.upper():
+        is_authorized = True
+
+    if not is_authorized:
+        return jsonify({"error": "Forbidden: You can only manage your own node"}), 403
 
     # 3. Toggle the status
     try:
