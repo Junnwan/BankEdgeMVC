@@ -1,159 +1,69 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- Header -->
 <div class="edge-header">
-  <h1 id="txn-page-title">Transaction Processing</h1>
-  <p id="txn-page-subtitle" class="card-subtitle">Stripe payment integration with edge/cloud processing</p>
+  <h1>Transaction Processing</h1>
+  <p class="card-subtitle">Stripe payment integration with edge/cloud processing</p>
 </div>
 
-<!-- Key Metrics -->
-<div class="stat-card-grid" id="txn-stat-cards">
-  <!-- Transaction stat cards will be injected by main.js -->
-</div>
-
-<!-- Tabs Navigation -->
 <div class="tabs-container">
-  <div class="tabs-list" role="tablist">
-    <button class="tab-trigger active" id="tab-overview" onclick="switchTxnTab('overview')" role="tab" aria-selected="true">Overview</button>
-    <button class="tab-trigger" id="tab-flow" onclick="switchTxnTab('flow')" role="tab" aria-selected="false">Transaction Flow</button>
-    <button class="tab-trigger" id="tab-stripe" onclick="switchTxnTab('stripe')" role="tab" aria-selected="false">Stripe Integration</button>
-  </div>
-
-  <!-- Tab Content: Overview -->
-  <div class="tab-content active" id="content-overview" role="tabpanel">
-    <div class="chart-grid">
-      <div class="card chart-card">
-        <h2 class="card-title">Processing Location Distribution</h2>
-        <div class="chart-container" style="height: 300px;">
-          <canvas id="txn-location-chart"></canvas>
-        </div>
-        <div class="prediction-summary">
-          <div>
-            <div class="value-green" id="proc-edge-count">0</div>
-            <div class="label">Edge (Fast)</div>
-            <div class="sublabel" id="proc-edge-avg">Avg 0ms</div>
-          </div>
-          <div>
-            <div class="value-blue" id="proc-cloud-count">0</div>
-            <div class="label">Cloud (Complex)</div>
-            <div class="sublabel" id="proc-cloud-avg">Avg 0ms</div>
-          </div>
-        </div>
-      </div>
-      <div class="card chart-card">
-        <h2 class="card-title">Payment Status Distribution</h2>
-        <div class="chart-container" style="height: 300px;">
-          <canvas id="txn-status-chart"></canvas>
-        </div>
+  <div class="card" style="max-width: 600px; margin: 0 auto;">
+    <div class="card-header">
+      <div class="stat-card-icon icon-bg-green" style="border-radius: 8px;"><i class="fas fa-money-bill-wave"></i></div>
+      <div style="flex-grow: 1; margin-left: 16px;">
+        <h2 class="card-title" style="margin: 0;">Initiate Transfer</h2>
+        <p class="card-subtitle" style="margin: 4px 0 0 0;">Enter details to proceed to secure checkout</p>
       </div>
     </div>
 
-    <div class="card">
-      <h2 class="card-title">Recent Transactions</h2>
-      <div class="table-container">
-        <table class="device-table" id="txn-table">
-          <thead>
-            <tr>
-              <th>Transaction ID</th>
-              <th>Type</th>
-              <th>Amount (RM)</th>
-              <th>Merchant</th>
-              <th>Processed At</th>
-              <th>Latency</th>
-              <th>ML Status</th>
-              <th>Payment Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="txn-table-body">
-            <!-- Transaction rows will be injected by main.js -->
-          </tbody>
-        </table>
+    <form id="payment-form" class="demo-form">
+      <div class="form-group">
+        <label for="recipientAccount">Recipient Account / Merchant</label>
+        <input type="text" id="recipientAccount" class="form-input" placeholder="e.g. 1122003344" required>
       </div>
-    </div>
-  </div>
 
-  <!-- Tab Content: Transaction Flow -->
-  <div class="tab-content" id="content-flow" role="tabpanel">
-    <div class="card">
-      <h2 class="card-title">Transaction Processing Pipeline</h2>
-      <div class="pipeline-container" id="txn-pipeline-grid">
-        <!-- Pipeline steps will be injected by main.js -->
-      </div>
-      <div class="chart-grid" style="margin-top: 24px;">
-        <div class="card chart-card" style="background-color: var(--sidebar-bg);">
-          <h3 class="card-title" style="font-size: 1.1rem;">Edge Processing (Fast Path)</h3>
-          <ul class="logic-list">
-            <li><i class="fas fa-check-circle" style="color: var(--green-light);"></i> Transaction received at local edge node</li>
-            <li><i class="fas fa-check-circle" style="color: var(--green-light);"></i> ML fraud detection (3.2ms inference)</li>
-            <li><i class="fas fa-check-circle" style="color: var(--green-light);"></i> Balance validation from local cache</li>
-            <li><i class="fas fa-check-circle" style="color: var(--green-light);"></i> Stripe API call for payment processing</li>
-            <li><i class="fas fa-check-circle" style="color: var(--green-light);"></i> Response returned (~15ms total)</li>
-          </ul>
-        </div>
-        <div class="card chart-card" style="background-color: var(--sidebar-bg);">
-          <h3 class="card-title" style="font-size: 1.1rem;">Cloud Processing (Complex Path)</h3>
-           <ul class="logic-list">
-            <li><i class="fas fa-check-circle" style="color: var(--blue-light);"></i> Large/complex transaction routed to cloud</li>
-            <li><i class="fas fa-check-circle" style="color: var(--blue-light);"></i> Deep ML analysis with historical patterns</li>
-            <li><i class="fas fa-check-circle" style="color: var(--blue-light);"></i> Compliance and regulatory checks</li>
-            <li><i class="fas fa-check-circle" style="color: var(--blue-light);"></i> Advanced fraud pattern matching</li>
-            <li><i class="fas fa-check-circle" style="color: var(--blue-light);"></i> Stripe processing + data archival (~80ms total)</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Tab Content: Stripe Integration (UPDATED UI) -->
-  <div class="tab-content" id="content-stripe" role="tabpanel">
-    <div class="card" style="max-width: 600px; margin: 0 auto;">
-      <div class="card-header">
-        <div class="stat-card-icon icon-bg-green" style="border-radius: 8px;"><i class="fas fa-money-bill-wave"></i></div>
-        <div style="flex-grow: 1; margin-left: 16px;">
-          <h2 class="card-title" style="margin: 0;">Initiate Transfer</h2>
-          <p class="card-subtitle" style="margin: 4px 0 0 0;">Enter details to proceed to secure checkout</p>
+      <div class="form-group">
+        <label for="amount">Amount (RM)</label>
+        <div style="position: relative;">
+          <span style="position: absolute; left: 12px; top: 10px; color: var(--muted-text);">RM</span>
+          <input type="number" id="amount" class="form-input" style="padding-left: 40px;" placeholder="0.00" min="1.00"
+            step="0.01" required>
         </div>
       </div>
 
-      <form id="payment-form" class="demo-form">
-        <div class="form-group">
-          <label for="recipientAccount">Recipient Account / Merchant</label>
-          <input type="text" id="recipientAccount" class="form-input" placeholder="e.g. 1122003344" required>
-        </div>
+      <div class="form-group">
+        <label for="reference">Reference (Optional)</label>
+        <input type="text" id="reference" class="form-input" placeholder="e.g. Invoice Payment">
+      </div>
 
-        <div class="form-group">
-           <label for="amount">Amount (RM)</label>
-           <div style="position: relative;">
-             <span style="position: absolute; left: 12px; top: 10px; color: var(--muted-text);">RM</span>
-             <input type="number" id="amount" class="form-input" style="padding-left: 40px;" placeholder="0.00" min="1.00" step="0.01" required>
-           </div>
+      <!-- Stripe Payment Element -->
+      <div class="form-group">
+        <label for="payment-element">Payment Method (Card, FPX, GrabPay)</label>
+        <div id="payment-element" class="form-input" style="padding: 12px; min-height: 200px;">
+          <!-- Stripe Payment Element will be inserted here -->
         </div>
+        <div id="payment-errors" role="alert" style="color: #fa755a; margin-top: 8px; font-size: 0.9em;"></div>
+      </div>
 
-        <div class="form-group">
-          <label for="reference">Reference (Optional)</label>
-          <input type="text" id="reference" class="form-input" placeholder="e.g. Invoice Payment">
+      <!-- Payment Message -->
+      <div id="payment-message" class="alert-banner" style="display: none; margin-top: 16px;"></div>
+
+      <div class="form-footer" style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+        <button type="submit" class="btn-sync" id="payment-submit-btn"
+          style="width: 100%; background-color: #635bff; font-size: 1rem; padding: 12px;">
+          Proceed to Payment
+        </button>
+        <p style="font-size: 0.8rem; color: var(--muted-text); margin-top: 12px;">
+          <i class="fas fa-lock"></i> Secured by Stripe
+        </p>
+        <div style="margin-top: 10px; gap: 8px; display: flex;">
+          <span style="font-size: 0.7rem; padding: 4px;"><i class="fas fa-credit-card"></i> Card</span>
+          <span style="font-size: 0.7rem; padding: 4px;"><i class="fas fa-university"></i> FPX</span>
+          <span style="font-size: 0.7rem; padding: 4px;"><i class="fas fa-wallet"></i> GrabPay</span>
         </div>
-
-        <!-- Payment Message -->
-        <div id="payment-message" class="alert-banner" style="display: none; margin-top: 16px;"></div>
-
-        <div class="form-footer" style="display: flex; flex-direction: column; align-items: center; text-align: center;">
-           <button type="submit" class="btn-sync" id="payment-submit-btn" style="width: 100%; background-color: #635bff; font-size: 1rem; padding: 12px;">
-            Proceed to Payment
-          </button>
-          <p style="font-size: 0.8rem; color: var(--muted-text); margin-top: 12px;">
-            <i class="fas fa-lock"></i> Secured by Stripe. You will be redirected to complete payment via Card, FPX, or GrabPay.
-          </p>
-          <div class="methods-grid" style="margin-top: 10px; gap: 8px; grid-template-columns: repeat(4, 1fr);">
-             <span style="font-size: 0.7rem; padding: 4px;"><i class="fas fa-credit-card"></i> Card</span>
-             <span style="font-size: 0.7rem; padding: 4px;"><i class="fas fa-university"></i> FPX</span>
-             <span style="font-size: 0.7rem; padding: 4px;"><i class="fas fa-wallet"></i> Grab</span>
-          </div>
-        </div>
-      </form>
-    </div>
+      </div>
+    </form>
   </div>
 </div>
+
 {% endblock %}
