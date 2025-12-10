@@ -622,7 +622,7 @@ input:checked+.slider:before {
 
 .login-right {
   display: none;
-  width: 50%;
+  width: 40%;
   /* Glassy gradient */
   background: linear-gradient(135deg, var(--theme-primary), #7a92a9);
   backdrop-filter: blur(20px);
@@ -637,7 +637,7 @@ input:checked+.slider:before {
 
 @media (min-width: 1024px) {
   .login-left {
-    width: 50%;
+    width: 60%;
   }
 
   .login-right {
@@ -682,7 +682,7 @@ input:checked+.slider:before {
 /* Form styling */
 .login-form-container {
   width: 100%;
-  max-width: 448px;
+  max-width: 500px;
   text-align: left;
   padding: 40px;
   background-color: var(--card-bg);
