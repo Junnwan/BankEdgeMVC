@@ -1,0 +1,17 @@
+BankEdge ML Model Validation Report
+===================================
+
+Model: Random Forest Classifier (n_estimators=100)
+Test Set Size: 2000 samples
+Features: ['amount', 'type', 'latency', 'txn_count_last_30d']
+
+Performance Metrics:
+              precision    recall  f1-score   support
+
+       cloud       0.97      0.87      0.91       370
+        edge       0.95      1.00      0.97      1588
+     flagged       0.00      0.00      0.00        42
+
+    accuracy                           0.95      2000
+   macro avg       0.64      0.62      0.63      2000
+weighted avg       0.93      0.95      0.94      2000

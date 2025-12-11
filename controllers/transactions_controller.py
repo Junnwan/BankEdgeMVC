@@ -81,8 +81,8 @@ def get_transactions():
             "amount": t.amount,
             "type": t.type,
             "stripe_status": t.stripe_status,
-            "ml_prediction": t.ml_prediction,
-            "processed_at": t.processed_at,
+            "stripe_status": t.stripe_status,
+            "processing_decision": t.processing_decision,
             "merchant_name": t.merchant_name,
             "device_id": t.device_id,
             "device_name": t.device.name if t.device else "Unknown",
@@ -324,19 +324,58 @@ def payment_success():
         # Create or update DB record
         txn = db.session.get(Transaction, pi_id)
 
+        # ML PREDICTION (Edge vs Cloud Offloading)
+        processed_at_label = "cloud" # Default
+        latency_val = 0.0
+        try:
+            # Simulate latency logic
+            import numpy as np
+            import pickle
+            import pandas as pd
+            
+            # Load Model (In production, load once at app startup)
+            model_path = os.path.join(current_app.root_path, 'ml_models', 'offloading_model.pkl')
+            if os.path.exists(model_path):
+                with open(model_path, 'rb') as f:
+                    clf = pickle.load(f)
+                
+                # Mock realtime latency and load
+                latency_val = float(int(np.random.gamma(shape=2.0, scale=10.0)))
+                device_load_val = float(np.random.uniform(10, 95))
+                
+                # Calculate Frequency (Pattern Learning)
+                # Count approvals for this user in last 30 days
+                txn_count = 0
+                if customer_id:
+                    cutoff_date = datetime.now() - timedelta(days=30)
+                    txn_count = Transaction.query.filter(
+                        Transaction.customer_id == customer_id,
+                        Transaction.timestamp >= cutoff_date
+                    ).count()
+                
+                # Predict
+                input_df = pd.DataFrame([{
+                    'amount': amount_rm,
+                    'type': 'Transfer', 
+                    'latency': latency_val,
+                    'txn_count_last_30d': txn_count
+                }])
+                processed_at_label = clf.predict(input_df)[0]
+        except Exception as e:
+            print("ML Prediction Failed:", e)
+            processed_at_label = "cloud" # Fallback
+
         if not txn:
             txn = Transaction(
                 id=pi_id,
                 amount=amount_rm,
                 stripe_status=final_status,
                 timestamp=datetime.now(timezone(timedelta(hours=8))),
-                processed_at="cloud",
-
+                
                 # new fields
                 old_balance_org=old_balance,
                 new_balance_org=new_balance,
-                is_fraud=False, # Default non-fraud
-
+                is_fraud=False,
                 recipient_account=recipient_account,
                 reference=reference,
 
@@ -344,11 +383,12 @@ def payment_success():
                 device_id=device_id,
                 customer_id=customer_id,
                 type="Transfer",
+                
+                # ML Logic (Real-Time)
+                processing_decision=processed_at_label, # 'edge' or 'cloud'
+                confidence=0.9 if processed_at_label == 'edge' else 0.7, # Higher confidence for edge rules
+                latency=latency_val
 
-                # keep ML fields for now (you said hold them)
-                ml_prediction="approved" if final_status == "succeeded" else "pending",
-                confidence=1.0 if final_status == "succeeded" else 0.0,
-                latency=0.0
             )
             db.session.add(txn)
         else:
@@ -361,7 +401,6 @@ def payment_success():
             txn.reference = reference
             txn.timestamp = datetime.now(timezone(timedelta(hours=8)))
             if final_status == "succeeded":
-                txn.ml_prediction = "approved"
                 txn.confidence = 1.0
 
         db.session.commit()

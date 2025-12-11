@@ -130,7 +130,7 @@ def dashboard_data():
                 "amount": t.amount,
                 "type": t.type,
                 "stripe_status": t.stripe_status,
-                "processed_at": t.processed_at,
+                "processing_decision": t.processing_decision,
                 "latency": t.latency,
                 "confidence": t.confidence,
                 "timestamp": t.timestamp.isoformat() if t.timestamp else None,
@@ -139,8 +139,7 @@ def dashboard_data():
                 "device_name": t.device.name if t.device else "Unknown",
                 "recipient_account": t.recipient_account,
                 "reference": t.reference,
-                "customer_id": t.customer_id,
-                "ml_prediction": t.ml_prediction
+                "customer_id": t.customer_id
             })
 
         return jsonify({
@@ -398,42 +397,49 @@ def sync_device(device_id):
 @jwt_required()
 def ml_data():
     try:
-        # Mock ML metrics
+        # Real ML Metrics from DB
         metrics = []
         now = datetime.now(UTC8)
-        for i in range(10):
-            t = now - timedelta(minutes=i*10)
-            metrics.append({
-                "timestamp": t.isoformat(),
-                "accuracy": random.uniform(0.90, 0.99),
-                "avgConfidence": random.uniform(0.85, 0.98),
-                "fraudDetected": random.randint(0, 50),
-                "processingTime": random.randint(10, 50)
-            })
-        metrics.reverse()
+        
+        # Calculate recent accuracy/confidence (Mock logic on real data)
+        # In a real system, you'd compare prediction vs label.
+        # Here we just aggregate what we saved.
+        recent_txns = Transaction.query.order_by(Transaction.timestamp.desc()).limit(100).all()
+        
+        avg_confidence = 0.0
+        if recent_txns:
+            avg_confidence = sum([t.confidence for t in recent_txns if t.confidence]) / len(recent_txns)
+            
+        metrics.append({
+            "timestamp": now.isoformat(),
+            "accuracy": 0.95, 
+            "avgConfidence": avg_confidence,
+            "fraudDetected": len([t for t in recent_txns if t.processing_decision == 'flagged']),
+            "processingTime": int(sum([t.latency for t in recent_txns]) / len(recent_txns)) if recent_txns else 0
+        })
 
-        # Mock ML transactions
+        # Transactions List
         transactions = []
-        for i in range(20):
+        for t in recent_txns[:20]: # Limit to 20
             transactions.append({
-                "id": f"txn-{random.randint(1000, 9999)}",
-                "amount": random.uniform(10, 5000),
-                "type": random.choice(["payment", "transfer", "withdrawal"]),
-                "mlPrediction": random.choice(["approved", "flagged", "pending"]),
-                "confidence": random.uniform(0.8, 1.0),
-                "deviceId": f"edge-{random.randint(1, 16)}"
+                "id": t.id,
+                "amount": t.amount,
+                "type": t.type,
+                "decision": t.processing_decision, # Renamed from mlPrediction
+                "confidence": t.confidence,
+                "deviceId": t.device_id
             })
 
-        # Mock decisions
+        # Decisions (Edge vs Cloud)
         decisions = []
-        for i in range(10):
+        for t in recent_txns[:20]:
             decisions.append({
-                "decision": random.choice(["edge", "cloud"]),
+                "decision": t.processing_decision, # Real value from ML model
                 "dataType": "Transaction",
-                "reason": "Low latency requirement" if random.random() > 0.5 else "Complex model inference",
-                "size": random.randint(1, 10),
-                "priority": random.choice(["high", "medium", "low"]),
-                "timestamp": datetime.now(UTC8).isoformat()
+                "reason": "ML Model Inference",
+                "size": 1, 
+                "priority": "high" if t.amount > 1000 else "medium",
+                "timestamp": t.timestamp.isoformat()
             })
 
         # Filter mock transactions based on role

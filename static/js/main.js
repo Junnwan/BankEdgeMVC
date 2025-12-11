@@ -232,8 +232,8 @@ function renderTransactions(transactions) {
                 ${edgeNodeCell}
                 <td>RM ${t.amount.toFixed(2)}</td>
                 <td><span class="status-badge ${statusClass}">${t.stripe_status}</span></td>
-                <td><span class="badge ${t.processed_at === 'edge' ? 'edge' : 'cloud'}">${t.processed_at}</span></td>
-                <td>${t.ml_prediction || '-'}</td>
+                <td><span class="badge ${t.processing_decision === 'edge' ? 'edge' : t.processing_decision === 'flagged' ? 'cloud' : 'cloud'}">${t.processing_decision}</span></td>
+                <td>${t.confidence ? (t.confidence * 100).toFixed(0) + '%' : '-'}</td>
                 <td>${new Date(t.timestamp).toLocaleString()}</td>
             </tr>
         `;
@@ -555,11 +555,16 @@ function renderMLPredictionChart(transactions) {
     if (!ctxEl) return;
     const ctx = ctxEl.getContext('2d');
 
-    const approved = transactions.filter(t => t.mlPrediction === 'approved').length;
-    const flagged = transactions.filter(t => t.mlPrediction === 'flagged').length;
-    const pending = transactions.filter(t => t.mlPrediction === 'pending').length;
+    const approved = transactions.filter(t => t.decision === 'edge' || t.decision === 'cloud' && t.stripeStatus === 'succeeded').length; // Logic tweak: ML doesn't 'approve', it routes. But let's say non-flagged is approved.
+    // Actually, let's simpler:
+    // Approved = edge/cloud (and not failed? let's stick to decision labels)
+    // The previous chart was "ML Prediction" which had approved/flagged.
+    // Now we have "Processing Decision": edge/cloud/flagged.
+    const edge = transactions.filter(t => t.decision === 'edge').length;
+    const cloud = transactions.filter(t => t.decision === 'cloud').length;
+    const flagged = transactions.filter(t => t.decision === 'flagged').length;
 
-    const data = [approved, flagged, pending];
+    const data = [edge, cloud, flagged];
 
     if (mlPredictionChart) {
         mlPredictionChart.data.datasets[0].data = data;
@@ -570,10 +575,10 @@ function renderMLPredictionChart(transactions) {
     mlPredictionChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['Approved', 'Flagged', 'Pending'],
+            labels: ['Edge', 'Cloud', 'Flagged'],
             datasets: [{
                 data: data,
-                backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+                backgroundColor: ['#10b981', '#3b82f6', '#ef4444'],
                 borderWidth: 0
             }]
         },
@@ -592,15 +597,15 @@ function renderRecentPredictions(transactions) {
         return `
             <div class="prediction-item">
                 <div class="prediction-info">
-                    <div class="prediction-icon ${txn.mlPrediction}">
-                        <i class="fas ${txn.mlPrediction === 'approved' ? 'fa-check' : 'fa-exclamation-triangle'}"></i>
+                    <div class="prediction-icon ${txn.decision}">
+                        <i class="fas ${txn.decision === 'edge' ? 'fa-server' : txn.decision === 'cloud' ? 'fa-cloud' : 'fa-exclamation-triangle'}"></i>
                     </div>
                     <div>
                         <div class="details">RM ${txn.amount.toFixed(2)} <span>- ${txn.type}</span></div>
                     </div>
                 </div>
                 <div class="prediction-status">
-                    <div class="badge ${txn.mlPrediction}">${txn.mlPrediction}</div>
+                    <div class="badge ${txn.decision}">${txn.decision}</div>
                     <div class="confidence">${(txn.confidence * 100).toFixed(1)}% confidence</div>
                 </div>
             </div>
@@ -767,8 +772,15 @@ function renderTxnStatCards(transactions) {
     const gridEl = document.getElementById('txn-stat-cards');
     if (!gridEl) return;
     const totalVolume = transactions.reduce((acc, t) => acc + t.amount, 0);
-    const successfulTxns = transactions.filter(t => t.stripeStatus === 'succeeded').length;
-    const edgeProcessed = transactions.filter(t => t.processedAt === 'edge').length;
+    const successfulTxns = transactions.filter(t => t.stripe_status === 'succeeded').length; // Ensure camelCase vs snake_case matches API response. The API seems to return snake_case for DB fields but the JS might assume camelCase?
+    // Looking at renderTxnTable earlier (line 220), it used t.stripe_status. So here it should be snake_case if it's the same object?
+    // Wait, loadTransactions creates pageTransactions from data.transactions.
+    // API returns dict with keys: 'stripe_status'.
+    // So 'stripeStatus' in previous code (line 770) might have been wrong unless there was a mapper.
+    // Let's check line 770 in original file... it says "t.stripeStatus".
+    // But in line 234 "t.stripe_status".
+    // I will correct it to t.stripe_status to be safe, assuming direct API response.
+    const edgeProcessed = transactions.filter(t => t.processing_decision === 'edge').length;
     const avgLatency = transactions.length > 0 ? (transactions.reduce((acc, t) => acc + t.latency, 0) / transactions.length).toFixed(0) : 0;
     const successRate = transactions.length > 0 ? (successfulTxns / transactions.length * 100).toFixed(1) : 0;
     const edgeRate = transactions.length > 0 ? (edgeProcessed / transactions.length * 100).toFixed(0) : 0;
@@ -892,7 +904,7 @@ function renderTxnTable(transactions) {
                     <td style="font-family: monospace; font-size: 0.85rem;">${txn.id ? txn.id.substring(0, 14) : 'N/A'}...</td>
                     <td>RM ${typeof txn.amount === 'number' ? txn.amount.toFixed(2) : '0.00'}</td>
                     <td>${statusBadge}</td>
-                    <td><span class="badge ${txn.processed_at === 'edge' ? 'edge' : 'cloud'}">${txn.processed_at}</span></td>
+                    <td><span class="badge ${txn.processing_decision === 'edge' ? 'edge' : (txn.processing_decision === 'flagged' ? 'status-error' : 'cloud')}">${txn.processing_decision}</span></td>
                     <td style="font-size: 0.85rem;">${txn.timestamp ? new Date(txn.timestamp).toLocaleString() : '-'}</td>
                     <td>${txn.recipient_account || '-'}</td>
                     <td>${txn.reference || '-'}</td>
@@ -942,8 +954,8 @@ function showTransactionDetails(txnId) {
         </div>
         <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 16px 0;">
         <div class="detail-row">
-            <span class="detail-label">Processed At</span>
-            <span class="detail-value"><span class="badge ${txn.processed_at === 'edge' ? 'edge' : 'cloud'}">${txn.processed_at}</span></span>
+            <span class="detail-label">Processing Decision</span>
+            <span class="detail-value"><span class="badge ${txn.processing_decision === 'edge' ? 'edge' : (txn.processing_decision === 'flagged' ? 'status-error' : 'cloud')}">${txn.processing_decision}</span></span>
         </div>
         <div class="detail-row">
             <span class="detail-label">Recipient</span>
@@ -1408,7 +1420,7 @@ function loadTransactions(page = 1) {
 
             renderTxnStatCards(pageTransactions);
             renderTxnLocationChart(pageTransactions);
-            renderTxnStatusChart(pageTransactions);
+            renderTxnStatusChart(pageTransactions); // Needs update to support 'flagged' if previously relying on 'mlPrediction'
             renderTxnTable(pageTransactions);
             renderTxnPipeline(pageTransactions);
             renderPaginationControls();

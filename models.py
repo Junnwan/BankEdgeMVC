@@ -53,7 +53,7 @@ class Transaction(db.Model):
     amount = db.Column(db.Float, nullable=False)
 
     stripe_status = db.Column(db.String(20), nullable=False, default='failed')
-    processed_at = db.Column(db.String(20), default='cloud')
+    processing_decision = db.Column(db.String(20), default='cloud') # Renamed from processed_at
 
     timestamp = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(UTC8))
 
@@ -72,7 +72,6 @@ class Transaction(db.Model):
     customer_id = db.Column(db.String(150), nullable=True)
 
     # Keep for dashboard
-    ml_prediction = db.Column(db.String(50), default='pending')
     confidence = db.Column(db.Float, default=0.0)
     latency = db.Column(db.Float, default=0.0)
 
@@ -81,7 +80,7 @@ class Transaction(db.Model):
             'id': self.id,
             'amount': self.amount,
             'stripe_status': self.stripe_status,
-            'processed_at': self.processed_at,
+            'processing_decision': self.processing_decision,
             'timestamp': self.timestamp.isoformat(),
             'recipient_account': self.recipient_account,
             'reference': self.reference,
@@ -89,7 +88,6 @@ class Transaction(db.Model):
             'device_id': self.device_id,
             'type': self.type,
             'customer_id': self.customer_id,
-            'ml_prediction': self.ml_prediction,
             'confidence': self.confidence,
             'latency': self.latency,
         }
