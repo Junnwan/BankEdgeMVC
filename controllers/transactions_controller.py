@@ -264,6 +264,13 @@ def payment_success():
              amount_rm = float(data.get("amount", 0.0))
 
         if user and final_status == 'succeeded':
+            # --- BALANCE CHECK ---
+            current_bal_check = user.balance if user.balance is not None else 0.0
+            if current_bal_check < amount_rm:
+                final_status = "failed" # Reject simulation due to insufficient funds
+            # ---------------------
+
+        if user and final_status == 'succeeded':
             # We assume balance check passed at init/update.
             # But concurrently it might have changed. 
             # Force deduction or check again?
