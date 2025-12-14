@@ -65,14 +65,17 @@ jobs:
       working-directory: ${{ steps.dir.outputs.path }}
       run: terraform validate
 
+    - name: Terraform Plan
+      working-directory: ${{ steps.dir.outputs.path }}
+      run: terraform plan -out=tfplan
+
     - name: Terraform Run
       working-directory: ${{ steps.dir.outputs.path }}
       run: |
         echo "Running ${{ inputs.command }} on ${{ inputs.target }}..."
         
         if [ "${{ inputs.command }}" == "deploy" ]; then
-          terraform plan
-          terraform apply -auto-approve
+          terraform apply -input=false tfplan
         elif [ "${{ inputs.command }}" == "destroy" ]; then
           terraform destroy -auto-approve
         fi
