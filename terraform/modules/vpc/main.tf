@@ -72,7 +72,7 @@ resource "aws_nat_gateway" "main" {
   tags = {
     Name = "${var.project_name}-nat"
   }
-  
+
   depends_on = [aws_internet_gateway.main]
 }
 

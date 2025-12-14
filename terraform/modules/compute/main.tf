@@ -26,9 +26,9 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 }
 
 resource "aws_instance" "app_server" {
-  ami           = "ami-0123c9b6bfb7eb962" # Ubuntu 22.04 LTS (ap-southeast-1) - Check latest!
-  instance_type = "t3.micro"
-  subnet_id     = var.subnet_id
+  ami                    = "ami-0123c9b6bfb7eb962" # Ubuntu 22.04 LTS (ap-southeast-1) - Check latest!
+  instance_type          = "t3.micro"
+  subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 

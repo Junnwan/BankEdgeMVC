@@ -12,13 +12,12 @@ on:
         - Main Services
         - Backend (Bootstrap)
       command:
-        description: 'Terraform Command'
+        description: 'Action'
         required: true
-        default: 'plan'
+        default: 'deploy'
         type: choice
         options:
-        - plan
-        - apply
+        - deploy
         - destroy
 
 env:
@@ -58,13 +57,22 @@ jobs:
       working-directory: ${{ steps.dir.outputs.path }}
       run: terraform init
 
+    - name: Terraform Format Check
+      working-directory: ${{ steps.dir.outputs.path }}
+      run: terraform fmt -check -recursive
+
+    - name: Terraform Validate
+      working-directory: ${{ steps.dir.outputs.path }}
+      run: terraform validate
+
     - name: Terraform Run
       working-directory: ${{ steps.dir.outputs.path }}
       run: |
         echo "Running ${{ inputs.command }} on ${{ inputs.target }}..."
         
-        if [ "${{ inputs.command }}" == "apply" ] || [ "${{ inputs.command }}" == "destroy" ]; then
-          terraform ${{ inputs.command }} -auto-approve
-        else
+        if [ "${{ inputs.command }}" == "deploy" ]; then
           terraform plan
+          terraform apply -auto-approve
+        elif [ "${{ inputs.command }}" == "destroy" ]; then
+          terraform destroy -auto-approve
         fi
