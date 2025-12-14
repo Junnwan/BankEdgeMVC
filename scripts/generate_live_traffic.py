@@ -46,16 +46,19 @@ def generate_traffic(base_url, count=50):
         }
 
         try:
-            # We use the payment intent endpoint to simulate a txn
-            r = session.post(f"{base_url}/api/init-payment-intent", json=payload, headers=headers)
+            # We use payment-success to actually SAVE the data to the DB
+            # We generate a fake PaymentIntent ID since we are simulating
+            fake_pi_id = f"pi_sim_{int(time.time())}_{i}"
+            
+            payload["payment_intent"] = fake_pi_id
+            
+            r = session.post(f"{base_url}/api/payment-success", json=payload, headers=headers)
             
             if r.status_code == 200:
-                data = r.json()
-                decision = data.get('processing_decision', 'unknown')
-                print(f"[{i+1}/{count}] 💰 ${amount} -> {decision.upper()} ✅")
+                print(f"[{i+1}/{count}] 💰 ${amount} -> SAVED ✅")
                 success += 1
             else:
-                print(f"[{i+1}/{count}] ❌ Failed: {r.status_code}")
+                print(f"[{i+1}/{count}] ❌ Failed: {r.status_code} {r.text}")
                 
         except Exception as e:
             print(f"Error: {e}")

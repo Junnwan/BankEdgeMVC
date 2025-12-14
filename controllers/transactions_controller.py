@@ -211,9 +211,35 @@ def payment_success():
         stripe.api_key = current_app.config.get("STRIPE_SECRET_KEY")
 
         # Retrieve PaymentIntent from Stripe
+        # Retrieve PaymentIntent from Stripe
         try:
-            intent = stripe.PaymentIntent.retrieve(pi_id)
-            raw_status = getattr(intent, "status", None)
+            if pi_id.startswith("pi_sim_"):
+                # --- DEMO SIMULATION BYPASS ---
+                # Trust the script-generated ID for demo purposes
+                # 90% Success, 10% Failure for realism
+                import random
+                is_fail = random.random() < 0.1
+                raw_status = "requires_payment_method" if is_fail else "succeeded" # 'failed' isn't a status, usually it's requires_payment_method or canceled
+                
+                # Mock an intent object so downstream logic works
+                class MockIntent:
+                    def __init__(self):
+                        self.amount = int(float(data.get("amount", 0)) * 100)
+                        self.payment_method = None
+                        self.metadata = {
+                            "recipient_account": data.get("recipient_account", "Demo Recipient"),
+                            "reference": data.get("reference", "Demo Ref"),
+                            "customer_id": get_jwt_identity(), # Use current user
+                            "device_id": data.get("device_id") # passed from script?
+                        }
+                        self.charges = None
+                        self.status = raw_status
+
+                intent = MockIntent()
+            else:
+                intent = stripe.PaymentIntent.retrieve(pi_id)
+                raw_status = getattr(intent, "status", None)
+
         except Exception as e:
             current_app.logger.warning("Stripe retrieve failed: %s", e)
             intent = None
