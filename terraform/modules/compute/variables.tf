@@ -1,0 +1,9 @@
+variable "project_name" {}
+variable "subnet_id" {}
+variable "security_group_id" {}
+variable "target_group_arn" {}
+variable "db_endpoint" {}
+variable "db_username" {}
+variable "db_password" {}
+variable "db_name" {}
+variable "docker_image" {}

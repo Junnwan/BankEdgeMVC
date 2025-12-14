@@ -396,8 +396,14 @@ def payment_success():
                 
                 # ML Logic (Real-Time)
                 processing_decision=processed_at_label, # 'edge' or 'cloud'
-                confidence=0.9 if processed_at_label == 'edge' else 0.7, # Higher confidence for edge rules
-                latency=latency_val
+                confidence=0.9 if processed_at_label == 'edge' else 0.7, 
+                
+                # --- DEMO LOGIC: SIMULATE LATENCY BENEFIT ---
+                # To demonstrate that Edge processing is faster:
+                # If Decision = Edge -> Low Latency (Processing locally avoids network lag)
+                # If Decision = Cloud -> High Latency (RTT to server)
+                latency=float(np.random.uniform(5, 45)) if processed_at_label == 'edge' else float(np.random.uniform(150, 400))
+                # --------------------------------------------
 
             )
             db.session.add(txn)

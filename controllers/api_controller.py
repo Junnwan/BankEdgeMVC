@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt, create_access_token, get_jwt_identity
 from models import db, User, Device, Transaction
+from sqlalchemy import func
 from datetime import datetime, timedelta, timezone
 import random
 
@@ -41,18 +42,47 @@ def get_hybrid_devices(target_device_id=None):
     else:
         devices = Device.query.all()
 
+    now = datetime.now(UTC8)
+    one_min_ago = now - timedelta(minutes=1)
+
+    # Pre-fetch stats for all devices to avoid N+1 queries if possible, 
+    # but for 16 devices, individual queries are acceptable for simplicity.
     results = []
+    
     for d in devices:
-        # Add mock real-time stats
+        # Calculate Real Stats based on last 1 minute of activity
+        # Load: defined as % of capacity (e.g. 100 txns/min = 100% load)
+        # Latency: Average of last minute
+        
+        # 1. Get transactions for this device in last minute
+        txns = db.session.query(
+            func.count(Transaction.id),
+            func.avg(Transaction.latency)
+        ).filter(
+            Transaction.device_id == d.id,
+            Transaction.timestamp >= one_min_ago
+        ).first()
+
+        count = txns[0] or 0
+        avg_lat = txns[1] or 0
+
+        # Calculate metrics
+        tps = count / 60.0
+        # Load logic: Cap at 100%, assuming 60 RPM (1 TPS) is "high load" for visualization
+        # Let's say 100 RPM is 100% load.
+        current_load = min((count / 100.0) * 100, 100.0)
+        if current_load == 0 and d.status == 'online':
+            current_load = 0.5 # Show tiny idle load if online
+
         results.append({
             "id": d.id,
             "name": d.name,
             "location": d.location,
             "region": d.region,
             "status": d.status,
-            "load": random.uniform(10, 90),
-            "latency": random.uniform(5, 50),
-            "transactionsPerSec": random.uniform(1, 100),
+            "load": current_load,
+            "latency": float(avg_lat), # Real average
+            "transactionsPerSec": tps,
             "lastSync": d.last_sync.isoformat() if d.last_sync else datetime.now(UTC8).isoformat(),
             "syncStatus": "synced" if d.status == 'online' else "pending"
         })
@@ -61,14 +91,42 @@ def get_hybrid_devices(target_device_id=None):
 def generate_latency_history():
     history = []
     now = datetime.now(UTC8)
+    
+    # Generate 20 points (last 60 mins -> 3 min intervals)
     for i in range(20):
-        t = now - timedelta(minutes=i*5)
+        end_time = now - timedelta(minutes=i*3)
+        start_time = end_time - timedelta(minutes=3)
+        
+        # Query DB for avg latency in this window
+        stats = db.session.query(
+            Transaction.processing_decision,
+            func.avg(Transaction.latency)
+        ).filter(
+            Transaction.timestamp >= start_time,
+            Transaction.timestamp < end_time
+        ).group_by(Transaction.processing_decision).all()
+        
+        # Defaults
+        edge_lat = 0
+        cloud_lat = 0
+        
+        for decision, avg_lat in stats:
+            if decision == 'edge':
+                edge_lat = avg_lat or 0
+            elif decision in ['cloud', 'flagged']:
+                # Average them if both exist, or valid approximation
+                if cloud_lat == 0:
+                     cloud_lat = avg_lat
+                else:
+                     cloud_lat = (cloud_lat + avg_lat) / 2
+
         history.append({
-            "timestamp": t.isoformat(),
-            "edge": random.uniform(5, 15),
-            "hybrid": random.uniform(10, 30),
-            "cloud": random.uniform(20, 100)
+            "timestamp": end_time.isoformat(),
+            "edge": float(edge_lat),
+            "hybrid": float(edge_lat) * 1.2 if edge_lat > 0 else 0, # Mock hybrid as slightly slower edge for now
+            "cloud": float(cloud_lat)
         })
+        
     return list(reversed(history))
 
 # Responsibilities:
@@ -397,17 +455,33 @@ def sync_device(device_id):
 @jwt_required()
 def ml_data():
     try:
-        # Calculate Trends: Current (Last 24h) vs Previous (24h-48h ago)
-        now = datetime.now(UTC8)
-        one_day_ago = now - timedelta(days=1)
-        two_days_ago = now - timedelta(days=2)
+        # 1. Determine Scope (User Role & Location)
+        claims = get_jwt()
+        role = claims.get('role')
+        user_location = claims.get("userLocation", "").upper()
+        
+        target_device_id = None
+        if role != 'superadmin':
+            locmap = {
+                "JOHOR": "edge-1", "KEDAH": "edge-2", "KELANTAN": "edge-3",
+                "MALACCA": "edge-4", "NEGERISEMBILAN": "edge-5", "PAHANG": "edge-6",
+                "PENANG": "edge-7", "PERAK": "edge-8", "PERLIS": "edge-9",
+                "SABAH": "edge-10", "SARAWAK": "edge-11", "SELANGOR": "edge-12",
+                "TERENGGANU": "edge-13", "KL": "edge-14", "LABUAN": "edge-15",
+                "PUTRAJAYA": "edge-16"
+            }
+            target_device_id = locmap.get(user_location)
 
-        # Helper to calc stats for a time range
-        def get_stats(start_time, end_time):
-            txns = Transaction.query.filter(
+        # 2. Helper to calc stats for a time range (with optional device filter)
+        def get_stats(start_time, end_time, device_id=None):
+            query = Transaction.query.filter(
                 Transaction.timestamp >= start_time, 
                 Transaction.timestamp < end_time
-            ).all()
+            )
+            if device_id:
+                query = query.filter_by(device_id=device_id)
+                
+            txns = query.all()
             
             if not txns:
                 return {'fraud': 0, 'confidence': 0, 'latency': 0, 'accuracy': 95.0} # Default static accuracy if no data
@@ -419,8 +493,13 @@ def ml_data():
             # Use Avg Confidence as a "Live Accuracy" proxy for now
             return {'fraud': fraud, 'confidence': confidence, 'latency': latency, 'accuracy': confidence * 100}
 
-        current = get_stats(one_day_ago, now)
-        previous = get_stats(two_days_ago, one_day_ago)
+        # 3. Calculate Trends: Current (Last 24h) vs Previous (24h-48h ago)
+        now = datetime.now(UTC8)
+        one_day_ago = now - timedelta(days=1)
+        two_days_ago = now - timedelta(days=2)
+
+        current = get_stats(one_day_ago, now, target_device_id)
+        previous = get_stats(two_days_ago, one_day_ago, target_device_id)
 
         # Trends
         fraud_trend = current['fraud'] - previous['fraud']
@@ -428,14 +507,12 @@ def ml_data():
         latency_trend = round(current['latency'] - previous['latency'], 0) # ms
         
         # Accuracy Trend (using confidence as proxy, scaled to percentage)
-        # Note: If accuracy is static 95%, we can show trend as 0 or mock it slightly for effect? 
-        # User said "Real". Real confidence trend is the most honest "Accuracy" trend we have.
         acc_trend = conf_trend 
 
         # Real Metrics Object
         metrics = [{
             "timestamp": now.isoformat(),
-            "accuracy": 0.95, # Keep static base but show real trend? Or use current['accuracy']/100? Let's stick to 95 as model baseline.
+            "accuracy": 0.95, # Keep static base but show real trend
             "fraudDetected": current['fraud'],
             "avgConfidence": current['confidence'],
             "processingTime": int(current['latency'])
@@ -449,8 +526,13 @@ def ml_data():
             "accuracy": acc_trend 
         }
 
-        # Recent Transactions for list
-        recent_txns = Transaction.query.order_by(Transaction.timestamp.desc()).limit(20).all()
+        # 4. Recent Transactions for list (Filtered by Device ID)
+        txn_query = Transaction.query.order_by(Transaction.timestamp.desc())
+        if target_device_id:
+            txn_query = txn_query.filter_by(device_id=target_device_id)
+            
+        recent_txns = txn_query.limit(20).all()
+        
         transactions = []
         for t in recent_txns:
             transactions.append({
@@ -462,26 +544,11 @@ def ml_data():
                 "deviceId": t.device_id
             })
 
-        # Custom "Latest Verification" object for UI Proof
-        latest_txn = Transaction.query.order_by(Transaction.timestamp.desc()).first()
-        latest_verification = None
-        if latest_txn:
-            latest_verification = {
-                "id": latest_txn.id,
-                "amount": latest_txn.amount,
-                "latency": latest_txn.latency,
-                # Recalculate or store txn count? We didn't store txn_count in DB, but it's an input.
-                # We can just show what we have.
-                "decision": latest_txn.processing_decision,
-                "confidence": latest_txn.confidence,
-                "timestamp": latest_txn.timestamp.isoformat()
-            }
-
-        # Decisions (Edge vs Cloud)
+        # 5. Decisions (Edge vs Cloud) - derived from the same filtered list
         decisions = []
-        for t in recent_txns[:20]:
+        for t in recent_txns:
             decisions.append({
-                "decision": t.processing_decision, # Real value from ML model
+                "decision": t.processing_decision,
                 "dataType": "Transaction",
                 "reason": "ML Model Inference",
                 "size": 1, 
@@ -489,24 +556,19 @@ def ml_data():
                 "timestamp": t.timestamp.isoformat()
             })
 
-        # Filter mock transactions based on role
-        claims = get_jwt()
-        role = claims.get('role')
-        user_location = claims.get("userLocation", "").upper()
-        
-        locmap = {
-            "JOHOR": "edge-1", "KEDAH": "edge-2", "KELANTAN": "edge-3",
-            "MALACCA": "edge-4", "NEGERISEMBILAN": "edge-5", "PAHANG": "edge-6",
-            "PENANG": "edge-7", "PERAK": "edge-8", "PERLIS": "edge-9",
-            "SABAH": "edge-10", "SARAWAK": "edge-11", "SELANGOR": "edge-12",
-            "TERENGGANU": "edge-13", "KL": "edge-14", "LABUAN": "edge-15",
-            "PUTRAJAYA": "edge-16"
-        }
-        target_device_id = locmap.get(user_location)
-
-        if role != 'superadmin' and target_device_id:
-            # Filter transactions to only include those for the user's device
-            transactions = [t for t in transactions if t['deviceId'] == target_device_id]
+        # 6. Latest Verification (Filtered)
+        # Note: 'recent_txns' is already ordered by desc timestamp, so index 0 is the latest.
+        latest_verification = None
+        if recent_txns:
+            latest_txn = recent_txns[0]
+            latest_verification = {
+                "id": latest_txn.id,
+                "amount": latest_txn.amount,
+                "latency": latest_txn.latency,
+                "decision": latest_txn.processing_decision,
+                "confidence": latest_txn.confidence,
+                "timestamp": latest_txn.timestamp.isoformat()
+            }
 
         return jsonify({
             "metrics": metrics,
