@@ -1,74 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ title }} - BankEdge Dashboard</title>
   <!-- Load Inter font and Font Awesome icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=32">
   <!-- Chart.js library -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- NEW: Stripe.js library -->
   <script src="https://js.stripe.com/v3/"></script>
 </head>
+
 <body>
+  <script>
+    // Critical: Apply collapsed state before render to prevent flash
+    if (localStorage.getItem('sidebarCollapsed') === 'true') {
+      document.body.classList.add('sidebar-collapsed', 'no-transition');
+    }
+    // Remove no-transition class after load to enable animations
+    window.addEventListener('load', () => {
+      document.body.classList.remove('no-transition');
+    });
+  </script>
   <div class="dashboard-container">
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        BankEdge
+        <span class="logo-text">BankEdge</span>
+        <button id="sidebar-toggle" class="sidebar-toggle">
+          <i class="fas fa-bars"></i>
+        </button>
       </div>
 
       <nav class="sidebar-nav">
         <!-- Jinja logic to set the active class based on the current request path -->
         {% set current_path = request.path %}
 
-        <a href="/dashboard" class="{% if current_path == '/dashboard' %}active{% endif %}">
-          <i class="fas fa-home"></i> Dashboard
+        <a href="/dashboard" class="{% if current_path == '/dashboard' %}active{% endif %}" title="Dashboard">
+          <i class="fas fa-home"></i> <span class="nav-text">Dashboard</span>
         </a>
-        <a href="/edge-devices" class="{% if current_path == '/edge-devices' %}active{% endif %}">
-          <i class="fas fa-microchip"></i> Edge Devices
+        <a href="/edge-devices" class="{% if current_path == '/edge-devices' %}active{% endif %}" title="Edge Devices">
+          <i class="fas fa-microchip"></i> <span class="nav-text">Edge Devices</span>
         </a>
-        <a href="/ml-insights" class="{% if current_path == '/ml-insights' %}active{% endif %}">
-          <i class="fas fa-brain"></i> Machine Learning
+        <a href="/ml-insights" class="{% if current_path == '/ml-insights' %}active{% endif %}"
+          title="Machine Learning">
+          <i class="fas fa-brain"></i> <span class="nav-text">Machine Learning</span>
         </a>
-        <a href="/transactions" class="{% if current_path == '/transactions' %}active{% endif %}">
-          <i class="fas fa-exchange-alt"></i> Transactions
+        <a href="/transactions" class="{% if current_path == '/transactions' %}active{% endif %}" title="Transactions">
+          <i class="fas fa-exchange-alt"></i> <span class="nav-text">Transactions</span>
         </a>
 
         <!-- SuperAdmin Link (hidden by default, shown by JS) -->
-        <a href="/system-management" id="nav-system-management" class="{% if current_path == '/system-management' %}active{% endif %}" style="display: none;">
-          <i class="fas fa-shield-alt"></i> System Management
+        <a href="/system-management" id="nav-system-management"
+          class="{% if current_path == '/system-management' %}active{% endif %}" style="display: none;"
+          title="System Management">
+          <i class="fas fa-shield-alt"></i> <span class="nav-text">System Management</span>
         </a>
       </nav>
 
+
+
       <div class="sidebar-footer">
         <!-- Dark Mode Toggle -->
-        <label for="dark-mode-toggle" class="switch">
+        <label for="dark-mode-toggle" class="switch" title="Toggle Dark Mode">
           <input type="checkbox" id="dark-mode-toggle">
           <span class="slider"></span>
         </label>
-        Dark Mode
+        <span class="nav-text">Dark Mode</span>
         <!-- Logout Button -->
-        <button onclick="handleLogout()" class="logout-button">
-            <i class="fas fa-sign-out-alt"></i> Logout
+        <button onclick="handleLogout()" class="logout-button" title="Logout">
+          <i class="fas fa-sign-out-alt"></i> <span class="nav-text">Logout</span>
         </button>
       </div>
     </div>
 
-    <div class="content">
+    <!-- Main Content -->
+    <div class="content" id="main-content">
+      <!-- ... content header ... -->
       <div class="content-header">
-        <h1 id="dashboard-title">{{ title }}</h1>
-        <div class="header-right">
-          <button class="refresh-button" id="refresh-button" title="Refresh Data">
-              <i class="fas fa-sync-alt"></i> Refresh
-          </button>
-          <div class="header-badges-container" id="header-badges">
-            <!-- Badges will be injected by main.js -->
+        <div class="header-left">
+          <h1>{{ title }}</h1>
+          <div class="header-subtitle">
+            {% block header_subtitle %}{% endblock %}
           </div>
-          <div id="user-info" class.user-info">
+        </div>
+        <div class="header-right">
+          <div id="user-info" class="user-info">
             <!-- User info will be injected by main.js -->
           </div>
+          <button class="refresh-button" id="refresh-button" title="Refresh Data">
+            <i class="fas fa-sync-alt"></i> Refresh
+          </button>
         </div>
       </div>
 
@@ -81,6 +105,40 @@
     </div>
   </div>
 
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}?v=22" defer></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const token = sessionStorage.getItem("authToken");
+      if (!token && window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+
+      // Sidebar Toggle Logic
+      const sidebar = document.getElementById('sidebar');
+      const toggleBtn = document.getElementById('sidebar-toggle');
+      // No longer need to reference the icon for toggling class
+
+      // Sync icon state with body class (already applied by inline script)
+      // if (document.body.classList.contains('sidebar-collapsed')) {
+      //   toggleIcon.classList.remove('fa-chevron-left');
+      //   toggleIcon.classList.add('fa-chevron-right');
+      // }
+
+      toggleBtn.addEventListener('click', () => {
+        document.body.classList.toggle('sidebar-collapsed');
+        const collapsed = document.body.classList.contains('sidebar-collapsed');
+        localStorage.setItem('sidebarCollapsed', collapsed);
+
+        // if (collapsed) {
+        //   toggleIcon.classList.remove('fa-chevron-left');
+        //   toggleIcon.classList.add('fa-chevron-right');
+        // } else {
+        //   toggleIcon.classList.remove('fa-chevron-right');
+        //   toggleIcon.classList.add('fa-chevron-left');
+        // }
+      });
+    });
+  </script>
 </body>
+
 </html>

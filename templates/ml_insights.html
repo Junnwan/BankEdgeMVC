@@ -1,256 +1,46 @@
 {% extends "base.html" %}
+{% block header_subtitle %}Real-time monitoring of machine learning models at the edge{% endblock %}
 {% block content %}
-
-<!-- Header -->
-<div class="edge-header">
-  <h1 id="ml-page-title">ML Classifier Performance</h1>
-  <p id="ml-page-subtitle" class="card-subtitle">Real-time monitoring of machine learning models at the edge</p>
-</div>
 
 <!-- ML Key Metrics -->
 <div class="stat-card-grid" id="ml-stat-cards">
   <!-- ML Stat cards will be injected by main.js -->
 </div>
 
-<!-- Tabs Navigation -->
-<div class="tabs-container">
-  <div class="tabs-list" role="tablist">
-    <button class="tab-trigger active" id="tab-performance" onclick="switchMLTab('performance')" role="tab" aria-selected="true">Performance Trends</button>
-    <button class="tab-trigger" id="tab-predictions" onclick="switchMLTab('predictions')" role="tab" aria-selected="false">Predictions</button>
-    <button class="tab-trigger" id="tab-processing" onclick="switchMLTab('processing')" role="tab" aria-selected="false">Edge vs Cloud</button>
-    <button class="tab-trigger" id="tab-model" onclick="switchMLTab('model')" role="tab" aria-selected="false">Model Analysis</button>
-  </div>
+<!-- Live Verification Section (Injected by JS) -->
+<div id="live-verification-container" style="margin-bottom: 24px;"></div>
 
-  <!-- Tab Content: Performance Trends -->
-  <div class="tab-content active" id="content-performance" role="tabpanel">
-    <div class="chart-grid">
-      <div class="card chart-card">
-        <div class="card-header">
-          <h2 class="card-title">ML Metrics Over Time</h2>
-          <span class="live-badge">Live</span>
-        </div>
-        <div class="chart-container" style="height: 350px;">
-          <canvas id="ml-metrics-chart"></canvas>
-        </div>
-      </div>
-      <div class="card chart-card">
-        <h2 class="card-title">Current Performance Radar</h2>
-        <div class="chart-container" style="height: 350px;">
-          <canvas id="ml-radar-chart"></canvas>
-        </div>
-      </div>
+<!-- Detailed Charts (Formerly Predictions Tab) -->
+<div class="chart-grid">
+  <div class="card chart-card">
+    <h2 class="card-title">Prediction Distribution</h2>
+    <div class="chart-container" style="height: 300px;">
+      <canvas id="ml-prediction-chart"></canvas>
     </div>
-    <div class="card">
-      <h2 class="card-title">Model Configuration</h2>
-      <div class="model-config-grid">
-        <div class="config-section">
-          <h3>Classifier Details</h3>
-          <ul class="config-list">
-            <li><span>Algorithm:</span> <strong>Random Forest</strong></li>
-            <li><span>Features:</span> <strong>24</strong></li>
-            <li><span>Training Samples:</span> <strong>1.2M</strong></li>
-            <li><span>Last Updated:</span> <strong>2 hours ago</strong></li>
-          </ul>
-        </div>
-        <div class="config-section">
-          <h3>Edge Deployment</h3>
-          <ul class="config-list">
-            <li><span>Model Size:</span> <strong>4.2 MB</strong></li>
-            <li><span>Inference Time:</span> <strong>3.2 ms</strong></li>
-            <li><span>Memory Usage:</span> <strong>128 MB</strong></li>
-            <li><span>Deployed Nodes:</span> <strong>16/16</strong></li>
-          </ul>
-        </div>
-        <div class="config-section">
-          <h3>Performance Stats</h3>
-          <ul class="config-list">
-            <li><span>Total Predictions:</span> <strong>3.4M</strong></li>
-            <li><span>Avg Confidence:</span> <strong class="value-green">94.2%</strong></li>
-            <li><span>False Positives:</span> <strong class="value-yellow">0.8%</strong></li>
-            <li><span>False Negatives:</span> <strong class="value-yellow">0.5%</strong></li>
-          </ul>
-        </div>
+    <div class="prediction-summary">
+      <div>
+        <div class="value-green" id="pred-edge-count">0</div>
+        <div class="label">Edge</div>
+        <div class="sublabel" id="pred-edge-pct">0%</div>
+      </div>
+      <div>
+        <div class="value-blue" id="pred-cloud-count" style="color: #3b82f6;">0</div>
+        <div class="label">Cloud</div>
+        <div class="sublabel" id="pred-cloud-pct">0%</div>
+      </div>
+      <div>
+        <div class="value-red" id="pred-flagged-count">0</div>
+        <div class="label">Flagged</div>
+        <div class="sublabel" id="pred-flagged-pct">0%</div>
       </div>
     </div>
   </div>
-
-  <!-- Tab Content: Predictions -->
-  <div class="tab-content" id="content-predictions" role="tabpanel">
-    <div class="chart-grid">
-      <div class="card chart-card">
-        <h2 class="card-title">Prediction Distribution</h2>
-        <div class="chart-container" style="height: 300px;">
-          <canvas id="ml-prediction-chart"></canvas>
-        </div>
-        <div class="prediction-summary">
-          <div>
-            <div class="value-green" id="pred-approved-count">0</div>
-            <div class="label">Approved</div>
-            <div class="sublabel" id="pred-approved-pct">0%</div>
-          </div>
-          <div>
-            <div class="value-red" id="pred-flagged-count">0</div>
-            <div class="label">Flagged</div>
-            <div class="sublabel" id="pred-flagged-pct">0%</div>
-          </div>
-          <div>
-            <div class="value-yellow" id="pred-pending-count">0</div>
-            <div class="label">Pending</div>
-            <div class="sublabel" id="pred-pending-pct">0%</div>
-          </div>
-        </div>
-      </div>
-      <div class="card chart-card">
-        <h2 class="card-title">Recent Predictions</h2>
-        <div class="recent-predictions-list" id="recent-predictions-list">
-          <!-- Predictions will be injected by main.js -->
-        </div>
-      </div>
+  <div class="card chart-card">
+    <h2 class="card-title">Recent Predictions</h2>
+    <div class="recent-predictions-list" id="recent-predictions-list">
+      <!-- Predictions will be injected by main.js -->
     </div>
   </div>
-
-  <!-- Tab Content: Edge vs Cloud -->
-  <div class="tab-content" id="content-processing" role="tabpanel">
-    <div class="stat-card-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 24px;">
-      <div class="stat-card">
-        <div class="stat-card-info">
-          <h3>Edge Processed</h3>
-          <p class="value" id="edge-processed-count">0</p>
-          <p class="subtitle positive">Fast, local processing</p>
-        </div>
-        <div class="stat-card-icon icon-bg-green"><i class="fas fa-server"></i></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-info">
-          <h3>Cloud Processed</h3>
-          <p class="value" id="cloud-processed-count">0</p>
-          <p class="subtitle" style="color: var(--blue-light);">Complex analysis</p>
-        </div>
-        <div class="stat-card-icon icon-bg-blue"><i class="fas fa-cloud"></i></div>
-      </div>
-    </div>
-    <div class="chart-grid">
-      <div class="card">
-        <h2 class="card-title">Data Processing Decisions</h2>
-        <div class="processing-decision-list" id="processing-decision-list">
-          <!-- Decisions will be injected by main.js -->
-        </div>
-      </div>
-      <div class="card">
-        <h2 class="card-title">Processing Logic</h2>
-        <div class="processing-logic-container">
-          <div class="logic-box edge">
-            <h3><i class="fas fa-server"></i> Edge Processing</h3>
-            <p>Data processed locally for low latency and real-time responses.</p>
-            <ul>
-              <li><i class="fas fa-check-circle"></i> <strong>Transaction Validation:</strong> Real-time balance checks</li>
-              <li><i class="fas fa-check-circle"></i> <strong>Fraud Detection:</strong> ML inference (3.2ms)</li>
-              <li><i class="fas fa-check-circle"></i> <strong>Customer Authentication:</strong> Cached credentials</li>
-              <li><i class="fas fa-check-circle"></i> <strong>Balance Check:</strong> Local cache of recent transactions</li>
-            </ul>
-          </div>
-          <div class="logic-box cloud">
-            <h3><i class="fas fa-cloud"></i> Cloud Processing</h3>
-            <p>Complex operations requiring historical data or deep analysis.</p>
-            <ul>
-              <li><i class="fas fa-check-circle"></i> <strong>Historical Analysis:</strong> Pattern recognition</li>
-              <li><i class="fas fa-check-circle"></i> <strong>Pattern Recognition:</strong> Cross-account fraud detection</li>
-              <li><i class="fas fa-check-circle"></i> <strong>Risk Assessment:</strong> Complex scoring algorithms</li>
-              <li><i class="fas fa-check-circle"></i> <strong>Compliance Check:</strong> Regulatory/AML screening</li>
-            </ul>
-          </div>
-        </div>
-        <div class="logic-summary">
-          <h4>Decision Criteria Summary</h4>
-          <div class="criteria-grid">
-            <div>
-              <p><strong>Routed to Edge when:</strong></p>
-              <ul>
-                <li>• Data size &lt; 100 KB</li>
-                <li>• Latency requirement &lt; 50ms</li>
-                <li>• Simple computation</li>
-                <li>• High priority transactions</li>
-              </ul>
-            </div>
-            <div>
-              <p><strong>Routed to Cloud when:</strong></p>
-              <ul>
-                <li>• Data size &gt; 100 KB</li>
-                <li>• Complex multi-step analysis</li>
-                <li>• Historical pattern required</li>
-                <li>• Compliance/regulatory checks</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Tab Content: Model Analysis -->
-  <div class="tab-content" id="content-model" role="tabpanel">
-    <div class="chart-grid">
-      <div class="card">
-        <h2 class="card-title">Feature Importance Analysis</h2>
-        <div class="feature-importance-list" id="feature-importance-list">
-          <!-- Feature bars will be injected by main.js -->
-        </div>
-      </div>
-      <div class="card">
-        <h2 class="card-title">Confusion Matrix</h2>
-        <div class="confusion-matrix">
-          <div class="matrix-header"></div>
-          <div class="matrix-header">Predicted Negative</div>
-          <div class="matrix-header">Predicted Positive</div>
-          <div class="matrix-header">Actual Negative</div>
-          <div class="matrix-cell tn">
-            <div class="value">8,542</div>
-            <div class="label">True Negative</div>
-          </div>
-          <div class="matrix-cell fp">
-            <div class="value">72</div>
-            <div class="label">False Positive</div>
-          </div>
-          <div class="matrix-header">Actual Positive</div>
-          <div class="matrix-cell fn">
-            <div class="value">48</div>
-            <div class="label">False Negative</div>
-          </div>
-          <div class="matrix-cell tp">
-            <div class="value">1,338</div>
-            <div class="label">True Positive</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <h2 class="card-title">Model Recommendations</h2>
-      <div class="recommendations-list">
-        <div class="reco-item positive">
-          <i class="fas fa-check-circle"></i>
-          <div>
-            <strong>Model Performing Well</strong>
-            <p>All metrics are within acceptable ranges</p>
-          </div>
-        </div>
-        <div class="reco-item info">
-          <i class="fas fa-brain"></i>
-          <div>
-            <strong>Retraining Scheduled</strong>
-            <p>Next update in 12 hours with new data</p>
-          </div>
-        </div>
-        <div class="reco-item warning">
-          <i class="fas fa-exclamation-triangle"></i>
-          <div>
-            <strong>Monitor Feature Drift</strong>
-            <p>Transaction patterns shifting in APAC region</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
 </div>
 
 {% endblock %}

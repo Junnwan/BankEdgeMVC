@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block header_subtitle %}Overview of system performance and edge nodes{% endblock %}
 {% block content %}
 
 <!-- Key Metrics Stat Cards -->
@@ -7,7 +8,7 @@
 </div>
 
 <!-- Charts Grid -->
-<div class="chart-grid">
+<div class="dashboard-stack">
   <div class="card chart-card">
     <h2 class="card-title">Latency Comparison</h2>
     <p class="card-subtitle">Edge vs Hybrid vs Cloud Processing</p>
@@ -37,8 +38,21 @@
 <div class="card">
   <h2 class="card-title">Recent Transactions</h2>
   <p class="card-subtitle">Latest processed transactions with ML predictions</p>
-  <div class="transaction-list" id="transactions-list">
-    <!-- Transaction items will be injected by main.js -->
+  <div class="card-body">
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th id="th-edge-node" class="edge-node-col" style="display:none;">Edge Node</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Processed At</th>
+          <th>ML Prediction</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody id="dashboard-txns-body"></tbody>
+    </table>
   </div>
 </div>
 

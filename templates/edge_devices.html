@@ -1,14 +1,9 @@
 {% extends "base.html" %}
+{% block header_subtitle %}Monitor and manage edge computing nodes across all regions{% endblock %}
 {% block content %}
 
-<!-- Header and Summary Cards -->
-<div class="edge-header">
-  <h1 id="edge-page-title">Edge Device Management</h1>
-  <p id="edge-page-subtitle" class="card-subtitle">Monitor and manage edge computing nodes across all regions</p>
-</div>
-
-<div class="summary-card-grid" id="summary-card-grid">
-  <!-- Summary cards will be injected by main.js -->
+<!-- Summary Cards -->
+<!-- Summary cards will be injected by main.js -->
 </div>
 
 <!-- Device Grid -->
@@ -16,32 +11,6 @@
   <h2 class="card-title">Device Grid View</h2>
   <div class="device-grid" id="device-grid-view">
     <!-- Device cards will be injected by main.js -->
-  </div>
-</div>
-
-<!-- Device Details Table -->
-<div class="card">
-  <h2 class="card-title">Device Details</h2>
-  <p class="card-subtitle">Comprehensive edge node information</p>
-  <div class="table-container">
-    <table class="device-table" id="device-table">
-      <thead>
-        <tr>
-          <th>Device</th>
-          <th>Location</th>
-          <th>Status</th>
-          <th>Latency</th>
-          <th>Load</th>
-          <th>TPS</th>
-          <th>Last Sync</th>
-          <th>Sync Status</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="device-table-body">
-        <!-- Table rows will be injected by main.js -->
-      </tbody>
-    </table>
   </div>
 </div>
 

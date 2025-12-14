@@ -2,9 +2,10 @@
 {% block content %}
 
 <!-- Header -->
-<div class="edge-header" style="display: flex; justify-content: space-between; align-items: center;">
+<!-- Header/Meta - Title is in Global Header -->
+<div class="edge-header"
+  style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
   <div>
-    <h1 id="sys-page-title">System Management</h1>
     <p id="sys-page-subtitle" class="card-subtitle">SuperAdmin control panel - Cloud-only secure access</p>
   </div>
   <span class="superadmin-badge">
@@ -15,7 +16,8 @@
 <!-- Info Alert -->
 <div class="alert-banner">
   <i class="fas fa-shield-alt"></i>
-  <p>All management operations are processed in the cloud for security. This includes admin account management, ML model uploads, and audit trail access.</p>
+  <p>All management operations are processed in the cloud for security. This includes admin account management, ML model
+    uploads, and audit trail access.</p>
 </div>
 
 <!-- Key Metrics -->
@@ -24,12 +26,13 @@
 </div>
 
 <!-- Tabs Navigation -->
+<!-- Tabs Navigation -->
 <div class="tabs-container">
   <div class="tabs-list" role="tablist">
-    <button class="tab-trigger active" id="tab-admins" onclick="switchSysTab('admins')" role="tab" aria-selected="true">Admin Accounts</button>
-    <button class="tab-trigger" id="tab-nodes" onclick="switchSysTab('nodes')" role="tab" aria-selected="false">Edge Nodes Status</button>
-    <button class="tab-trigger" id="tab-models" onclick="switchSysTab('models')" role="tab" aria-selected="false">ML Models</button>
-    <button class="tab-trigger" id="tab-audit" onclick="switchSysTab('audit')" role="tab" aria-selected="false">Audit Trail</button>
+    <button class="tab-trigger active" id="tab-admins" onclick="switchSysTab('admins')" role="tab"
+      aria-selected="true">Admin Accounts</button>
+    <button class="tab-trigger" id="tab-audit" onclick="switchSysTab('audit')" role="tab" aria-selected="false">Activity
+      Logs</button>
   </div>
 
   <!-- Tab Content: Admin Accounts -->
@@ -46,9 +49,7 @@
           <thead>
             <tr>
               <th>Username</th>
-              <th>Email</th>
               <th>Role</th>
-              <th>API Key</th>
               <th>Last Login</th>
               <th>Status</th>
               <th>Actions</th>
@@ -62,51 +63,10 @@
     </div>
   </div>
 
-  <!-- Tab Content: Edge Nodes Status -->
-  <div class="tab-content" id="content-nodes" role="tabpanel">
-    <div class="card">
-      <h2 class="card-title">All Edge Nodes Status</h2>
-      <div class="nodes-grid-container" id="sys-edge-nodes-grid">
-        <!-- Edge node cards will be injected by main.js -->
-      </div>
-    </div>
-  </div>
-
-  <!-- Tab Content: ML Models -->
-  <div class="tab-content" id="content-models" role="tabpanel">
-    <div class="card">
-      <div class="card-header">
-        <h2 class="card-title">ML Model Management</h2>
-        <button class="btn-sync" id="upload-model-btn">
-          <i class="fas fa-upload"></i> Upload New Model
-        </button>
-      </div>
-      <div class="table-container">
-        <table class="device-table" id="model-table">
-          <thead>
-            <tr>
-              <th>Version</th>
-              <th>Uploaded At</th>
-              <th>Uploaded By</th>
-              <th>Size</th>
-              <th>Accuracy</th>
-              <th>Deployed Nodes</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="model-table-body">
-            <!-- Model rows will be injected by main.js -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- Tab Content: Audit Trail -->
+  <!-- Tab Content: Activity Logs (Renamed from Audit Trail) -->
   <div class="tab-content" id="content-audit" role="tabpanel">
     <div class="card">
-      <h2 class="card-title">Audit Trail & Activity Logs</h2>
+      <h2 class="card-title">Activity Logs</h2>
       <div class="table-container">
         <table class="device-table" id="audit-table">
           <thead>
@@ -114,9 +74,6 @@
               <th>Timestamp</th>
               <th>User</th>
               <th>Action</th>
-              <th>Resource</th>
-              <th>IP Address</th>
-              <th>Status</th>
             </tr>
           </thead>
           <tbody id="audit-table-body">
@@ -126,6 +83,10 @@
       </div>
     </div>
   </div>
+
+</div>
+
+
 
 </div>
 
@@ -140,30 +101,90 @@
 
     <!-- Validation Error Alert -->
     <div class="error-alert" id="modal-error-message" style="display: none; margin-bottom: 16px;">
-        <i class="fas fa-exclamation-circle"></i>
-        <span id="modal-error-description">Error placeholder</span>
+      <i class="fas fa-exclamation-circle"></i>
+      <span id="modal-error-description">Error placeholder</span>
     </div>
 
     <form id="add-admin-form" class="demo-form" style="margin-top: 0;">
       <div class="form-group">
-        <label for="newAdminUsername">Username (Email)</label>
-        <input type="email" id="newAdminUsername" class="form-input" placeholder="admin.location@bankedge.com" required>
-        <p class="card-subtitle" style="font-size: 0.8rem; margin-top: 4px;">Must end with @bankedge.com</p>
+        <label for="newAdminLocation">Location</label>
+        <select id="newAdminLocation" class="form-input">
+          <option value="Johor">Johor</option>
+          <option value="Kedah">Kedah</option>
+          <option value="Kelantan">Kelantan</option>
+          <option value="Malacca">Malacca</option>
+          <option value="NegeriSembilan">Negeri Sembilan</option>
+          <option value="Pahang">Pahang</option>
+          <option value="Penang">Penang</option>
+          <option value="Perak">Perak</option>
+          <option value="Perlis">Perlis</option>
+          <option value="Sabah">Sabah</option>
+          <option value="Sarawak">Sarawak</option>
+          <option value="Selangor">Selangor</option>
+          <option value="Terengganu">Terengganu</option>
+          <option value="KL">Kuala Lumpur</option>
+          <option value="Labuan">Labuan</option>
+          <option value="Putrajaya">Putrajaya</option>
+        </select>
+        <p class="card-subtitle" style="font-size: 0.8rem; margin-top: 4px;">Username will be auto-generated (e.g.,
+          admin.johor@bankedge.com)</p>
       </div>
       <div class="form-group">
         <label for="newAdminPassword">Password</label>
-        <input type="password" id="newAdminPassword" class="form-input" placeholder="Enter password" required>
+        <div class="input-group">
+          <input type="password" id="newAdminPassword" class="form-input" placeholder="Enter password" required>
+          <i class="fas fa-eye input-icon" id="toggleNewAdminPassword"></i>
+        </div>
         <p class="card-subtitle" style="font-size: 0.8rem; margin-top: 4px;">Must contain capital, small, and symbol</p>
-      </div>
-      <div class="form-group">
-        <label for="newAdminRole">Role</label>
-        <select id="newAdminRole" class="form-input">
-          <option value="admin">Admin</option>
-          <option value="superadmin">SuperAdmin</option>
-        </select>
       </div>
       <div class="modal-footer">
         <button type="submit" class="btn-sync" id="create-admin-btn">Create Account</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- "Edit Admin" Modal (Dialog) -->
+<div class="modal-backdrop" id="edit-admin-modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="card-title">Edit Admin Account</h2>
+      <button class="modal-close" id="close-edit-modal-btn">&times;</button>
+    </div>
+    <p class="card-subtitle">Update admin details</p>
+
+    <!-- Validation Error Alert -->
+    <div class="error-alert" id="edit-modal-error-message" style="display: none; margin-bottom: 16px;">
+      <i class="fas fa-exclamation-circle"></i>
+      <span id="edit-modal-error-description">Error placeholder</span>
+    </div>
+
+    <form id="edit-admin-form" class="demo-form" style="margin-top: 0;">
+      <input type="hidden" id="editAdminId">
+      <div class="form-group">
+        <label for="editAdminUsername">Username (Email)</label>
+        <input type="email" id="editAdminUsername" class="form-input" disabled
+          style="opacity: 0.7; cursor: not-allowed;">
+        <p class="card-subtitle" style="font-size: 0.8rem; margin-top: 4px;">Username cannot be changed</p>
+      </div>
+      <div class="form-group">
+        <label for="editAdminPassword">New Password (Optional)</label>
+        <div class="input-group">
+          <input type="password" id="editAdminPassword" class="form-input" placeholder="Leave blank to keep current">
+          <i class="fas fa-eye input-icon" id="toggleEditAdminPassword"></i>
+        </div>
+        <p class="card-subtitle" style="font-size: 0.8rem; margin-top: 4px;">Must contain capital, small, and symbol</p>
+      </div>
+      <div class="form-group">
+        <label for="editAdminConfirmPassword">Confirm New Password</label>
+        <div class="input-group">
+          <input type="password" id="editAdminConfirmPassword" class="form-input" placeholder="Re-enter new password">
+          <i class="fas fa-eye input-icon" id="toggleEditAdminConfirmPassword"></i>
+        </div>
+      </div>
+      <input type="hidden" id="editAdminRole">
+      <div class="modal-footer">
+        <button type="submit" class="btn-sync" id="update-admin-btn">Update Account</button>
       </div>
     </form>
   </div>
