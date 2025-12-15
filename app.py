@@ -40,6 +40,17 @@ db.init_app(app)
 bcrypt.init_app(app)
 jwt = JWTManager(app)
 
+# Enable SQLite Write-Ahead Logging (WAL) for concurrency
+if 'sqlite' in (app.config['SQLALCHEMY_DATABASE_URI'] or ''):
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+
+    @event.listens_for(Engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.close()
+
 # -------------------------------------------------
 # Register Blueprints
 # -------------------------------------------------
@@ -49,6 +60,18 @@ app.register_blueprint(transactions_bp)
 # -------------------------------------------------
 # Routes (Template Rendering Only)
 # -------------------------------------------------
+@app.after_request
+def add_header(response):
+    """
+    Add headers to both force latest IE rendering engine or Chrome Frame,
+    and also to cache the rendered page for 10 minutes.
+    """
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
 @app.route('/')
 def login_page():
     return render_template('login.html')

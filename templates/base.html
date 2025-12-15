@@ -12,6 +12,17 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- NEW: Stripe.js library -->
   <script src="https://js.stripe.com/v3/"></script>
+
+  <!-- Critical Auth Check: Run immediately before body render -->
+  <script>
+    (function () {
+      const token = sessionStorage.getItem("authToken");
+      // Allow login page ("/") to bypass, otherwise require token
+      if (!token && window.location.pathname !== "/") {
+        window.location.replace("/");
+      }
+    })();
+  </script>
 </head>
 
 <body>
@@ -108,10 +119,8 @@
   <script src="{{ url_for('static', filename='js/main.js') }}?v=22" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
-      const token = sessionStorage.getItem("authToken");
-      if (!token && window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
+      // Auth check moved to head for immediate execution
+
 
       // Sidebar Toggle Logic
       const sidebar = document.getElementById('sidebar');

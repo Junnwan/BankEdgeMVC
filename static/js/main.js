@@ -108,14 +108,13 @@ function renderLatencyChart(latencyData) {
 
     const labels = latencyData.map(d => new Date(d.timestamp).toLocaleTimeString());
     const edgeData = latencyData.map(d => d.edge);
-    const hybridData = latencyData.map(d => d.hybrid);
     const cloudData = latencyData.map(d => d.cloud);
 
     if (dashboardChart) {
         dashboardChart.data.labels = labels;
         dashboardChart.data.datasets[0].data = edgeData;
-        dashboardChart.data.datasets[1].data = hybridData;
-        dashboardChart.data.datasets[2].data = cloudData;
+        // dataset[1] was hybrid, now removed
+        dashboardChart.data.datasets[1].data = cloudData;
         dashboardChart.update();
     } else {
         dashboardChart = new Chart(ctx, {
@@ -124,7 +123,6 @@ function renderLatencyChart(latencyData) {
                 labels: labels,
                 datasets: [
                     { label: 'Edge Latency', data: edgeData, borderColor: '#10b981', tension: 0.4 },
-                    { label: 'Hybrid Latency', data: hybridData, borderColor: '#f59e0b', tension: 0.4 },
                     { label: 'Cloud Latency', data: cloudData, borderColor: '#3b82f6', tension: 0.4 }
                 ]
             },
@@ -687,7 +685,7 @@ function renderLiveVerification(verification) {
         cardEl = document.createElement('div');
         cardEl.id = 'live-verification-card';
         // Removed 'stat-card' to avoid grid flex constraints. Using generic card style.
-        cardEl.className = 'card';
+        cardEl.className = 'card contrast-panel';
         cardEl.style.width = '100%';
         cardEl.style.marginBottom = '20px';
         cardEl.style.boxSizing = 'border-box'; // Ensure padding doesn't overflow width
@@ -1130,8 +1128,8 @@ function renderAdminTable() {
             <td>${admin.lastLogin !== 'Never' ? new Date(admin.lastLogin).toLocaleString() : 'Never'}</td>
             <td><span class="status-badge ${admin.status}">${admin.status}</span></td>
             <td class="action-cell">
-                <button class="action-button" onclick="handleEditAdmin('${admin.id}')">Edit</button>
-                <button class="action-button delete" onclick="handleDeleteAdmin('${admin.id}')">Delete</button>
+                <button class="action-button" onclick="handleEditAdmin('${admin.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+                <button class="action-button delete" onclick="handleDeleteAdmin('${admin.id}')" title="Delete"><i class="fas fa-trash-alt"></i></button>
             </td>
         </tr>
         `).join('');
@@ -1190,7 +1188,6 @@ function renderAuditLogsTable() {
         <tr>
             <td style="font-size: 0.8rem;"><i class="fas fa-clock"></i> ${new Date(log.timestamp).toLocaleString()}</td>
             <td><strong>${log.user}</strong></td>
-            <td><span class="sync-status-badge">${log.action}</span></td>
         </tr>
         `).join('');
 }

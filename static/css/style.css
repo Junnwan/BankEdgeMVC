@@ -3,13 +3,13 @@
 
 :root {
   /* Light Mode Colors */
-  --bg-color: #f0f4f8;
+  --bg-color: #dbe4ef;
   /* Tinted for glass */
   --text-color: #030213;
   --muted-text: #717182;
-  --border-color: rgba(255, 255, 255, 0.4);
   /* Glass border */
-  --card-bg: rgba(255, 255, 255, 0.65);
+  --card-bg: rgba(255, 255, 255, 0.85);
+  /* Increased opacity for better contrast */
   /* Glass card */
 
   /* Main System Color */
@@ -17,7 +17,8 @@
   --theme-primary-dark: #1a253a;
 
   /* Sidebar Specific */
-  --sidebar-bg: rgba(255, 255, 255, 0.65);
+  --sidebar-bg: rgba(255, 255, 255, 0.85);
+  /* Matched card opacity */
   /* Glass sidebar */
   --sidebar-accent-bg: rgba(160, 180, 200, 0.2);
   --sidebar-text: #030213;
@@ -34,7 +35,18 @@
   --teal-primary: var(--theme-primary);
   --teal-dark: var(--theme-primary-dark);
 
-  /* Status Colors */
+  /* Table Status Badges */
+  .device-table th,
+  .device-table td {
+    text-align: center;
+    /* User request to center align */
+  }
+
+  .device-table .action-cell {
+    justify-content: center;
+    /* Center the buttons */
+  }
+
   --status-active-bg: #e6f7ec;
   --status-active-text: #008000;
   --status-inactive-bg: #f5f5f5;
@@ -43,7 +55,7 @@
   --status-error-text: #d90000;
 
   /* Dashboard Accents */
-  --db-bg: #f0f4f8;
+  --db-bg: #dbe4ef;
   --blue-light: #3b82f6;
   --green-light: #10b981;
   --purple-light: #8b5cf6;
@@ -52,8 +64,10 @@
 
   /* Glass Effect Variables */
   --glass-blur: blur(12px);
-  --glass-border: 1px solid rgba(255, 255, 255, 0.3);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.6);
+  /* Slightly more visible border */
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+  /* Stronger shadow */
 }
 
 .dark {
@@ -195,8 +209,9 @@ body.sidebar-collapsed .logout-button i {
   font-weight: 600;
   color: var(--text-color);
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
+  position: relative;
 }
 
 .sidebar-toggle {
@@ -207,6 +222,15 @@ body.sidebar-collapsed .logout-button i {
   padding: 4px;
   border-radius: 4px;
   transition: background 0.2s;
+  position: absolute;
+  /* Take out of flow to allow true centering of text */
+  right: 24px;
+  /* Align with padding */
+}
+
+/* Reset position for collapsed state to allow flex centering */
+body.sidebar-collapsed .sidebar-toggle {
+  position: static;
 }
 
 .sidebar-toggle:hover {
@@ -272,7 +296,7 @@ body.sidebar-collapsed .logout-button i {
   padding: 8px;
   display: block;
   width: 100%;
-  text-align: left;
+  text-align: center;
   margin-top: 10px;
   border-radius: 6px;
   transition: background-color 0.2s, color 0.2s;
@@ -317,7 +341,8 @@ body.sidebar-collapsed .content {
   align-items: flex-start;
   margin-bottom: 32px;
   padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 2px solid #cbd5e1;
+  /* Thicker and slightly darker for visibility */
 }
 
 .content h1 {
@@ -331,6 +356,12 @@ body.sidebar-collapsed .content {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 /* Dashboard Charts Layout */
@@ -405,6 +436,10 @@ body.sidebar-collapsed .content {
   /* Removed border since user section has it */
   font-size: 0.85rem;
   color: var(--muted-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 
 
@@ -418,10 +453,10 @@ body.sidebar-collapsed .content {
   background-color: var(--card-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border: var(--glass-border);
+  border: 1px solid #cbd5e1;
   border-radius: 12px;
   padding: 24px;
-  box-shadow: var(--glass-shadow);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   margin-bottom: 24px;
 }
 
@@ -698,11 +733,13 @@ input:checked+.slider:before {
   margin-bottom: 8px;
   color: var(--teal-primary);
   font-weight: 600;
+  text-align: center;
 }
 
 .login-form-container p {
   color: var(--muted-text);
   margin-bottom: 32px;
+  text-align: center;
 }
 
 .form-group {
@@ -3459,4 +3496,90 @@ input:checked+.slider:before {
   /* Restored border-top */
   margin-top: auto;
   /* Push to bottom */
+}
+
+/* Fix for extra line in tabs (User Request) */
+.tabs-list {
+  border-bottom: none !important;
+}
+
+/* --- Edge Device Node Cards (Contrast Fix) --- */
+.node-card {
+  background-color: #ffffff;
+  /* Solid white for contrast against glass parent */
+  border: 1px solid #cbd5e1;
+  /* Visible grey border */
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dark .node-card {
+  background-color: #1e293b;
+  /* Slate-800 for dark mode */
+  border-color: #334155;
+}
+
+.node-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 12px;
+}
+
+.node-card h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.node-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+
+.node-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* --- Inner Contrast Panels (User Request) --- */
+.contrast-panel,
+.table-container,
+.recent-predictions-list,
+.demo-form,
+.processing-decision-list,
+.form-input-container {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  margin-top: 15px;
+}
+
+.dark .contrast-panel,
+.dark .table-container,
+.dark .recent-predictions-list,
+.dark .demo-form,
+.dark .processing-decision-list {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+/* Fix for tables inside contrast panels */
+.contrast-panel table,
+.table-container table {
+  width: 100%;
+  border-collapse: collapse;
 }

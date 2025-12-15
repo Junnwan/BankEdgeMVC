@@ -1,0 +1,4 @@
+/* Fix for extra line in tabs */
+.tabs-list {
+    border-bottom: none !important;
+}

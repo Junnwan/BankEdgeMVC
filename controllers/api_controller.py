@@ -35,6 +35,26 @@ def login():
 def get_config():
     return jsonify({'publishableKey': current_app.config.get('STRIPE_PUBLISHABLE_KEY', '')})
 
+# 2025 POPULATION DATA (in millions * 1M)
+TXN_CAPACITY_MAP = {
+    "edge-1":  4200000, # Johor
+    "edge-2":  2200000, # Kedah
+    "edge-3":  1900000, # Kelantan
+    "edge-4":  1100000, # Melaka
+    "edge-5":  1200000, # Negeri Sembilan
+    "edge-6":  1700000, # Pahang
+    "edge-7":  1800000, # Penang
+    "edge-8":  2600000, # Perak
+    "edge-9":   300000, # Perlis
+    "edge-10": 3800000, # Sabah
+    "edge-11": 2500000, # Sarawak
+    "edge-12": 7400000, # Selangor
+    "edge-13": 1200000, # Terengganu
+    "edge-14": 2100000, # KL
+    "edge-15":  100000, # Labuan
+    "edge-16":  100000, # Putrajaya
+}
+
 def get_hybrid_devices(target_device_id=None):
     # Fetch real devices from DB
     if target_device_id:
@@ -45,8 +65,7 @@ def get_hybrid_devices(target_device_id=None):
     now = datetime.now(UTC8)
     one_min_ago = now - timedelta(minutes=1)
 
-    # Pre-fetch stats for all devices to avoid N+1 queries if possible, 
-    # but for 16 devices, individual queries are acceptable for simplicity.
+    # Pre-fetch stats for all devices to avoid N+1 queries if possible
     results = []
     
     for d in devices:
@@ -67,12 +86,14 @@ def get_hybrid_devices(target_device_id=None):
         avg_lat = txns[1] or 0
 
         # Calculate metrics
-        tps = count / 60.0
-        # Load logic: Cap at 100%, assuming 60 RPM (1 TPS) is "high load" for visualization
-        # Let's say 100 RPM is 100% load.
-        current_load = min((count / 100.0) * 100, 100.0)
+        tps = count / 60.0 # TPS
+        
+        # NEW FORMULA: Load = (Txn / Population) * 100
+        capacity = TXN_CAPACITY_MAP.get(d.id, 1000000) # Default 1M
+        current_load = min((count / capacity) * 100.0, 100.0)
+        
         if current_load == 0 and d.status == 'online':
-            current_load = 0.5 # Show tiny idle load if online
+            current_load = 0.0 # Clean zero
 
         results.append({
             "id": d.id,
@@ -81,14 +102,14 @@ def get_hybrid_devices(target_device_id=None):
             "region": d.region,
             "status": d.status,
             "load": current_load,
-            "latency": float(avg_lat), # Real average
+            "latency": float(avg_lat) if avg_lat else 5.0, # Real average or base 5ms
             "transactionsPerSec": tps,
             "lastSync": d.last_sync.isoformat() if d.last_sync else datetime.now(UTC8).isoformat(),
             "syncStatus": "synced" if d.status == 'online' else "pending"
         })
     return results
 
-def generate_latency_history():
+def generate_latency_history(device_id=None):
     history = []
     now = datetime.now(UTC8)
     
@@ -98,13 +119,18 @@ def generate_latency_history():
         start_time = end_time - timedelta(minutes=3)
         
         # Query DB for avg latency in this window
-        stats = db.session.query(
+        query = db.session.query(
             Transaction.processing_decision,
             func.avg(Transaction.latency)
         ).filter(
             Transaction.timestamp >= start_time,
             Transaction.timestamp < end_time
-        ).group_by(Transaction.processing_decision).all()
+        )
+        
+        if device_id:
+            query = query.filter(Transaction.device_id == device_id)
+            
+        stats = query.group_by(Transaction.processing_decision).all()
         
         # Defaults
         edge_lat = 0
@@ -123,7 +149,7 @@ def generate_latency_history():
         history.append({
             "timestamp": end_time.isoformat(),
             "edge": float(edge_lat),
-            "hybrid": float(edge_lat) * 1.2 if edge_lat > 0 else 0, # Mock hybrid as slightly slower edge for now
+            # "hybrid": REMOVED
             "cloud": float(cloud_lat)
         })
         
@@ -204,7 +230,9 @@ def dashboard_data():
             "deviceBox": device_box,
             "devices": filtered_devices,
             "transactions": txn_data,
-            "latency": generate_latency_history(),
+            "devices": filtered_devices,
+            "transactions": txn_data,
+            "latency": generate_latency_history(device_id),
             "userBalance": user_balance
         })
 
@@ -317,12 +345,15 @@ def system_data():
             {"id": "model-003", "name": "TxnClassifier_v3", "version": "3.0.1", "accuracy": "99.1%", "status": "Training"}
         ]
 
-        # 4. Audit Logs (Mock)
-        audit_logs = [
-            {"id": 1, "action": "User Login", "user": "admin.kl@bankedge.com", "timestamp": "2023-10-27 09:15:00", "details": "Successful login from IP 192.168.1.10"},
-            {"id": 2, "action": "Update Device", "user": "superadmin@bankedge.com", "timestamp": "2023-10-27 09:30:00", "details": "Updated firmware for edge-1"},
-            {"id": 3, "action": "Create User", "user": "superadmin@bankedge.com", "timestamp": "2023-10-27 10:05:00", "details": "Created user admin.test@bankedge.com"}
-        ]
+        # 4. Real "Audit Logs" (derived from User Last Login)
+        recent_logins = User.query.filter(User.last_login != None).order_by(User.last_login.desc()).limit(20).all()
+        audit_logs = []
+        for u in recent_logins:
+            audit_logs.append({
+                "timestamp": u.last_login.isoformat(),
+                "user": u.username,
+                "action": "User Login"
+            })
 
         return jsonify({
             "admins": admins_data,
