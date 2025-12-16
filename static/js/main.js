@@ -30,7 +30,7 @@ function handleLogin(e) {
                 // Redirect based on role/auth
                 window.location.href = '/dashboard';
             } else {
-                errorMsg.textContent = data.msg || "Invalid credentials";
+                errorMsg.textContent = data.msg || data.error || "Invalid credentials";
                 errorMsg.style.display = "block";
             }
         })
