@@ -52,7 +52,13 @@ def import_data():
                 # DO NOT CALL set_password(), use the hash directly
                 db.session.add(user)
             else:
-                print(f"Skipping existing user {u_data['username']}")
+                # OPTIONAL: Overwrite existing user data with migration data
+                # This ensures if seed_devices ran first, we update with the "real" local data
+                existing.balance = u_data.get('balance', 100000.0)
+                existing.password_hash = u_data['password_hash']
+                existing.role = u_data['role']
+                # existing.last_login = ... (Optional)
+                print(f"Updated existing user {u_data['username']}")
 
         # Import Transactions
         print("Importing Transactions...")
