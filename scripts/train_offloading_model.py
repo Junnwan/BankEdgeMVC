@@ -1,5 +1,5 @@
 import pandas as pd
-import pickle
+import joblib
 import os
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
@@ -9,13 +9,14 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 
 def train_model():
-    input_file = 'ml_data/transactions_dataset_10000.csv'
+    input_file = 'ml_data/transactions_dataset_500k_latest.csv'
     if not os.path.exists(input_file):
         print(f"Error: {input_file} not found.")
         return
 
     print(f"Loading data from {input_file}...")
     df = pd.read_csv(input_file)
+    print(f"Total records: {len(df)}")
 
     # --- Feature Engineering ---
     print("Calculating engineered features (txn_count_last_30d)...")
@@ -33,7 +34,6 @@ def train_model():
     df['txn_count_last_30d'] = df['txn_count_last_30d'].fillna(0)
 
     # Features (X) and Target (y)
-    # Note: 'device_load' is removed as it is not in the new dataset.
     features = ['amount', 'type', 'latency', 'txn_count_last_30d']
     target = 'processing_decision'
     
@@ -71,15 +71,15 @@ def train_model():
     print("Accuracy:", accuracy_score(y_test, y_pred))
     print("\nClassification Report:\n", classification_report(y_test, y_pred))
     
-    # Save Model
+    # Save Model (Compressed)
     if not os.path.exists('ml_models'):
         os.makedirs('ml_models')
         
     model_path = 'ml_models/offloading_model.pkl'
-    with open(model_path, 'wb') as f:
-        pickle.dump(clf, f)
+    # Use compression=3 to reduce size < 100MB for GitHub
+    joblib.dump(clf, model_path, compress=3)
         
-    print(f"Model saved to {model_path}")
+    print(f"Model saved to {model_path} (Compressed)")
 
 if __name__ == "__main__":
     train_model()
