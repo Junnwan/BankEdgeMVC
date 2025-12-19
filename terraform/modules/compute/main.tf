@@ -25,14 +25,18 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
-resource "aws_instance" "app_server" {
-  ami                    = "ami-0123c9b6bfb7eb962" # Ubuntu 22.04 LTS (ap-southeast-1) - Check latest!
-  instance_type          = "t3.micro"
-  subnet_id              = var.subnet_id
-  vpc_security_group_ids = [var.security_group_id]
-  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+resource "aws_launch_template" "app" {
+  name_prefix   = "${var.project_name}-lt-"
+  image_id      = "ami-0123c9b6bfb7eb962" # Ubuntu 22.04 LTS
+  instance_type = "t3.micro"
 
-  user_data = <<-EOF
+  vpc_security_group_ids = [var.security_group_id]
+  
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_profile.name
+  }
+
+  user_data = base64encode(<<-EOF
               #!/bin/bash
               apt-get update
               apt-get install -y docker.io
@@ -46,14 +50,35 @@ resource "aws_instance" "app_server" {
                 --name bankedge \
                 ${var.docker_image}
               EOF
+  )
 
-  tags = {
-    Name = "${var.project_name}-app-server"
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name = "${var.project_name}-app-server"
+    }
   }
 }
 
-resource "aws_lb_target_group_attachment" "app" {
-  target_group_arn = var.target_group_arn
-  target_id        = aws_instance.app_server.id
-  port             = 5000
+resource "aws_autoscaling_group" "app" {
+  name                = "${var.project_name}-asg"
+  vpc_zone_identifier = var.subnet_ids
+  target_group_arns   = [var.target_group_arn]
+  health_check_type   = "ELB"
+  health_check_grace_period = 300
+
+  min_size         = 1
+  max_size         = 2
+  desired_capacity = 1
+
+  launch_template {
+    id      = aws_launch_template.app.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "${var.project_name}-app-asg"
+    propagate_at_launch = true
+  }
 }

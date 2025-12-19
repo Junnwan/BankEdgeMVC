@@ -56,7 +56,7 @@ module "compute" {
 
   project_name = var.project_name
   # Use first private subnet for simplicity, typically would use ASG for HA
-  subnet_id         = module.vpc.private_subnet_ids[0]
+  subnet_ids        = module.vpc.private_subnet_ids
   security_group_id = module.security.ec2_sg_id
   target_group_arn  = module.alb.target_group_arn
 

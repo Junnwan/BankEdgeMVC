@@ -382,13 +382,12 @@ def payment_success():
                 
                 # Mock realtime latency and load
                 latency_val = float(int(np.random.gamma(shape=2.0, scale=10.0)))
-                device_load_val = float(np.random.uniform(10, 95))
+                # device_load_val = float(np.random.uniform(10, 95))
                 
                 # Calculate Frequency (Pattern Learning)
-                # Count approvals for this user in last 30 days
                 txn_count = 0
                 if customer_id:
-                    cutoff_date = datetime.now() - timedelta(days=30)
+                    cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
                     txn_count = Transaction.query.filter(
                         Transaction.customer_id == customer_id,
                         Transaction.timestamp >= cutoff_date
@@ -405,13 +404,16 @@ def payment_success():
                 
                 # --- ML PROOF LOGGING ---
                 print("\n" + "="*50)
-                print(f" [ML PROOF] Transaction Processing")
+                print(f" [ML PROOF - RANDOM FOREST] Transaction Processing")
                 print(f"   > ID: {pi_id}")
                 print(f"   > Inputs: Amount={amount_rm}, Latency={latency_val}, TxnCount={txn_count}")
                 print(f"   > Prediction: {processed_at_label.upper()}")
                 print(f"   > Confidence: {0.9 if processed_at_label == 'edge' else 0.7}")
                 print("="*50 + "\n")
                 # ------------------------
+            else:
+                print("Random Forest Model not found. Using default decision (Cloud).")
+
         except Exception as e:
             print("ML Prediction Failed:", e)
             processed_at_label = "cloud" # Fallback
