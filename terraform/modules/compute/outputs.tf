@@ -1,3 +1,3 @@
-output "instance_id" {
-  value = aws_instance.app_server.id
+output "asg_name" {
+  value = aws_autoscaling_group.app.name
 }
