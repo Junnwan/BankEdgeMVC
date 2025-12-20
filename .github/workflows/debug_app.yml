@@ -1,0 +1,39 @@
+name: Debug App Logs
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-southeast-1
+
+jobs:
+  get_logs:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Fetch Docker Logs
+      run: |
+        echo "Sending command to fetch logs..."
+        CMD_ID=$(aws ssm send-command \
+          --document-name "AWS-RunShellScript" \
+          --targets "Key=tag:Name,Values=bankedge-app-server" \
+          --max-concurrency "1" \
+          --parameters commands='["docker logs --tail 200 bankedge"]' \
+          --query "Command.CommandId" --output text)
+        
+        echo "Command ID: $CMD_ID"
+        echo "Waiting for execution..."
+        sleep 5
+        
+        # Poll status
+        aws ssm list-command-invocations \
+          --command-id "$CMD_ID" \
+          --details \
+          --query "CommandInvocations[0].CommandPlugins[0].Output" \
+          --output text
