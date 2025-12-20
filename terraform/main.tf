@@ -67,3 +67,11 @@ module "compute" {
 
   docker_image = var.docker_image
 }
+
+# 6. CDN Module (CloudFront)
+module "cdn" {
+  source = "./modules/cdn"
+
+  project_name = var.project_name
+  alb_dns_name = module.alb.dns_name
+}
