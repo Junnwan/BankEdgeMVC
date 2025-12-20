@@ -16,6 +16,21 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
+  ordered_cache_behavior {
+    path_pattern     = "/api/*"
+    allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "ALB-${var.alb_dns_name}"
+
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    # Managed-CachingDisabled 
+    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+    # Managed-AllViewer
+    origin_request_policy_id = "216adef6-5c7f-47e4-b989-5492eafa07d3"
+  }
+
   default_cache_behavior {
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods   = ["GET", "HEAD"]

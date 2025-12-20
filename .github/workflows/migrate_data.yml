@@ -23,6 +23,8 @@ jobs:
         aws ssm send-command \
           --document-name "AWS-RunShellScript" \
           --targets "Key=tag:Name,Values=bankedge-app-server" \
+          --max-concurrency "1" \
+          --comment "Running Data Migration" \
           --comment "Running Data Migration" \
           --parameters commands='[
             "docker exec bankedge python scripts/import_db.py"
