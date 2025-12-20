@@ -26,9 +26,8 @@ resource "aws_cloudfront_distribution" "main" {
     compress               = true
 
     # Managed-CachingDisabled 
-    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
-    # Managed-AllViewer
-    origin_request_policy_id = "216adef6-5c7f-47e4-b989-5492eafa07d3"
+    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
+    origin_request_policy_id = "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
   }
 
   default_cache_behavior {
@@ -39,9 +38,8 @@ resource "aws_cloudfront_distribution" "main" {
     viewer_protocol_policy = "redirect-to-https"
 
     # Use AWS Managed Caching Policy (CachingOptimized)
-    # This caches static files based strictly on headers/cookies defined in policy
-    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
-    origin_request_policy_id = "216adef6-5c7f-47e4-b989-5492eafa07d3" # AllViewer
+    cache_policy_id          = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+    origin_request_policy_id = "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
   }
 
   restrictions {
