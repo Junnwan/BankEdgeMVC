@@ -13,6 +13,7 @@ resource "aws_iam_role" "ec2_role" {
       }
     ]
   })
+}
 
 resource "aws_iam_role_policy" "ssm_access" {
   name = "${var.project_name}-ssm-access"
