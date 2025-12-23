@@ -95,7 +95,19 @@ module "waf" {
   }
 }
 
-# 7. CDN Module (CloudFront)
+# 7. ACM Module (Certificate)
+module "acm" {
+  source = "./modules/acm"
+
+  project_name = var.project_name
+  domain_name  = var.domain_name
+
+  providers = {
+    aws = aws.us_east_1
+  }
+}
+
+# 8. CDN Module (CloudFront)
 module "cdn" {
   source = "./modules/cdn"
 
