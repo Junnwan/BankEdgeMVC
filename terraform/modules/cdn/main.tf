@@ -3,6 +3,7 @@ resource "aws_cloudfront_distribution" "main" {
   is_ipv6_enabled     = true
   price_class         = "PriceClass_100" # Use US/Europe/Asia edge (Cheapest)
   wait_for_deployment = false
+  web_acl_id          = var.web_acl_arn
 
   origin {
     domain_name = var.alb_dns_name

@@ -5,6 +5,9 @@ terraform {
       version = "~> 5.0"
     }
   }
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
 }
 
 # 1. Network Module
@@ -68,10 +71,22 @@ module "compute" {
   docker_image = var.docker_image
 }
 
-# 6. CDN Module (CloudFront)
+# 6. WAF Module (Global)
+module "waf" {
+  source = "./modules/waf"
+
+  project_name = var.project_name
+
+  providers = {
+    aws = aws.us_east_1
+  }
+}
+
+# 7. CDN Module (CloudFront)
 module "cdn" {
   source = "./modules/cdn"
 
   project_name = var.project_name
   alb_dns_name = module.alb.dns_name
+  web_acl_arn  = module.waf.web_acl_arn
 }
