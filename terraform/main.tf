@@ -117,3 +117,25 @@ module "cdn" {
   domain_name         = var.domain_name
   acm_certificate_arn = module.acm.certificate_arn
 }
+
+# 9. Threat Detection (GuardDuty)
+module "guardduty" {
+  source = "./modules/guardduty"
+
+  project_name = var.project_name
+}
+
+# 10. Security Compliance (Security Hub)
+module "securityhub" {
+  source = "./modules/securityhub"
+}
+
+# 11. Observability (CloudWatch)
+module "cloudwatch" {
+  source = "./modules/cloudwatch"
+
+  project_name            = var.project_name
+  asg_name                = module.compute.asg_name
+  alb_arn_suffix          = module.alb.alb_arn_suffix
+  target_group_arn_suffix = module.alb.target_group_arn_suffix
+}
