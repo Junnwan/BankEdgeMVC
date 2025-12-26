@@ -94,7 +94,11 @@ class BankEdgeUser(HttpUser):
             "region": "KL",
             "payment_intent": fake_pi_id,
             "recipient_account": "1234567890", 
-            "reference": "LoadTest"
+            "reference": "LoadTest",
+            
+            # --- UT-07 PROOF: Inject Latency ---
+            # 10% of traffic mimics high network delay (>300ms) to trigger Cloud Offloading
+            "latency": random.randint(300, 500) if random.random() < 0.1 else random.randint(5, 20)
         }
 
         # We assume the decision logic (Edge/Cloud) happens on the server 

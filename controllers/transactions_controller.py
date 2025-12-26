@@ -380,8 +380,11 @@ def payment_success():
                 with open(model_path, 'rb') as f:
                     clf = pickle.load(f)
                 
-                # Mock realtime latency and load
-                latency_val = float(int(np.random.gamma(shape=2.0, scale=10.0)))
+                # Mock realtime latency (OR accept injection from Load Test)
+                if data.get('latency') is not None:
+                     latency_val = float(data.get('latency'))
+                else:
+                     latency_val = float(int(np.random.gamma(shape=2.0, scale=10.0)))
                 # device_load_val = float(np.random.uniform(10, 95))
                 
                 # Calculate Frequency (Pattern Learning)
