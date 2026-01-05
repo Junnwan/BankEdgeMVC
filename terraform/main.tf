@@ -7,8 +7,6 @@ terraform {
   }
 }
 
-
-
 provider "aws" {
   alias  = "us_east_1"
   region = "us-east-1"
@@ -47,7 +45,6 @@ module "database" {
   db_password       = var.db_password
 }
 
-
 # 4. SSM Module (Secrets)
 module "ssm" {
   source = "./modules/ssm"
@@ -68,7 +65,7 @@ module "alb" {
   security_group_id = module.security.alb_sg_id
 }
 
-# 5. Compute Module (App)
+# 6. Compute Module (App)
 module "compute" {
   source = "./modules/compute"
 
@@ -86,7 +83,7 @@ module "compute" {
   docker_image = var.docker_image
 }
 
-# 6. WAF Module (Global)
+# 7. WAF Module (Global)
 module "waf" {
   source = "./modules/waf"
 
@@ -97,7 +94,7 @@ module "waf" {
   }
 }
 
-# 7. ACM Module (Certificate)
+# 8. ACM Module (Certificate)
 module "acm" {
   source = "./modules/acm"
 
@@ -109,7 +106,7 @@ module "acm" {
   }
 }
 
-# 8. CDN Module (CloudFront)
+# 9. CDN Module (CloudFront)
 module "cdn" {
   source = "./modules/cdn"
 
@@ -120,19 +117,19 @@ module "cdn" {
   acm_certificate_arn = module.acm.certificate_arn
 }
 
-# 9. Threat Detection (GuardDuty)
+# 10. Threat Detection (GuardDuty)
 module "guardduty" {
   source = "./modules/guardduty"
 
   project_name = var.project_name
 }
 
-# 10. Security Compliance (Security Hub)
+# 11. Security Compliance (Security Hub)
 module "securityhub" {
   source = "./modules/securityhub"
 }
 
-# 11. Observability (CloudWatch)
+# 12. Observability (CloudWatch)
 module "cloudwatch" {
   source = "./modules/cloudwatch"
 

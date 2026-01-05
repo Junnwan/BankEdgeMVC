@@ -21,10 +21,9 @@ def train_model():
     # --- Feature Engineering ---
     print("Calculating engineered features (txn_count_last_30d)...")
     df['timestamp'] = pd.to_datetime(df['timestamp'])
-    
     # Sort by customer and time
     df = df.sort_values(['customer_id', 'timestamp'])
-    
+
     # Calculate rolling count per user (past 30 days)
     # Using 'amount' as a dummy column to count
     df_indexed = df.set_index('timestamp')

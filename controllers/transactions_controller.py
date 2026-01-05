@@ -10,7 +10,7 @@ transactions_bp = Blueprint('transactions_api', __name__, url_prefix='/api')
 
 
 # =====================================================================
-# DEVICE MAPPING: Map user email → region → device table
+# DEVICE MAPPING: Map user email with region and device table
 # =====================================================================
 def get_device_for_user(username):
     """
@@ -64,7 +64,7 @@ def get_transactions():
             "PUTRAJAYA": "edge-16"
         }
         target_device_id = locmap.get(user_location)
-        
+
         if target_device_id:
             query = query.filter_by(device_id=target_device_id)
         else:
@@ -151,7 +151,7 @@ def update_payment_intent(intent_id):
         user = User.query.filter_by(username=username).first()
         if not user:
              return jsonify({'error': 'User not found'}), 404
-             
+
         current_balance = user.balance if user.balance is not None else 0.0
         if current_balance < float(amount):
             return jsonify({'error': f'Insufficient funds. Balance: RM {current_balance:.2f}'}), 400
@@ -192,10 +192,9 @@ def update_payment_intent(intent_id):
 @transactions_bp.route('/payment-success', methods=['POST'])
 @jwt_required()
 def payment_success():
-    """
-    Saves final payment result (after Stripe redirect or immediate confirm).
-    Only store: succeeded / failed (mapped).
-    """
+    # Saves final payment result (after Stripe redirect or immediate confirm).
+    # Only store: succeeded / failed (mapped).
+
     data = request.get_json() or {}
     pi_id = (
         data.get('payment_intent')
@@ -211,16 +210,13 @@ def payment_success():
         stripe.api_key = current_app.config.get("STRIPE_SECRET_KEY")
 
         # Retrieve PaymentIntent from Stripe
-        # Retrieve PaymentIntent from Stripe
         try:
             if pi_id.startswith("pi_sim_"):
-                # --- DEMO SIMULATION BYPASS ---
-                # Trust the script-generated ID for demo purposes
-                # 90% Success, 10% Failure for realism
+                # --- LOCUST DEMO SIMULATION ---
                 import random
                 is_fail = random.random() < 0.1
-                raw_status = "requires_payment_method" if is_fail else "succeeded" # 'failed' isn't a status, usually it's requires_payment_method or canceled
-                
+                raw_status = "requires_payment_method" if is_fail else "succeeded"
+
                 # Mock an intent object so downstream logic works
                 class MockIntent:
                     def __init__(self):
@@ -229,8 +225,8 @@ def payment_success():
                         self.metadata = {
                             "recipient_account": data.get("recipient_account", "Demo Recipient"),
                             "reference": data.get("reference", "Demo Ref"),
-                            "customer_id": get_jwt_identity(), # Use current user
-                            "device_id": data.get("device_id") # passed from script?
+                            "customer_id": get_jwt_identity(),
+                            "device_id": data.get("device_id")
                         }
                         self.charges = None
                         self.status = raw_status
@@ -253,10 +249,10 @@ def payment_success():
         # -----------------------------------------------------------------
         username = get_jwt_identity()
         user = User.query.filter_by(username=username).first()
-        
+
         old_balance = 0.0
         new_balance = 0.0
-        
+
         # Determine amount
         if intent and getattr(intent, "amount", None) is not None:
              amount_rm = float(intent.amount) / 100.0
@@ -265,37 +261,28 @@ def payment_success():
 
         if user and final_status == 'succeeded':
             # --- BALANCE CHECK ---
-            # Bypass check for simulation to prevent "Insufficient Funds" during load testing
+            # Bypass check for LOCUST DEMO SIMULATION
             if not pi_id.startswith("pi_sim_"):
                 current_bal_check = user.balance if user.balance is not None else 0.0
                 if current_bal_check < amount_rm:
                      final_status = "failed" # Reject real transactions due to insufficient funds
-            # ---------------------
 
         if user and final_status == 'succeeded':
-            # We assume balance check passed at init/update.
-            # But concurrently it might have changed. 
-            # Force deduction or check again?
-            # For this MVC, just deduct.
             old_balance = user.balance if user.balance is not None else 0.0
             if user.balance is None: user.balance = 0.0
-            
-            # --- SIMULATION BYPASS ---
+
+            # --- LOCUST DEMO SIMULATION BYPASS ---
             # Do not deduct money for load testing interactions
             if not pi_id.startswith("pi_sim_"):
                 user.balance -= amount_rm
-            # -------------------------
-            
+
             new_balance = user.balance
-            # Ensure balance doesn't go negative? 
-            # if user.balance < 0: user.balance = 0 (optional)
+
         elif user:
-            # Failed tx, no deduction
             old_balance = user.balance if user.balance is not None else 0.0
             new_balance = user.balance if user.balance is not None else 0.0
         payment_method = "unknown"
         try:
-            # preferred: use the PaymentMethod attached to the PaymentIntent
             pm_id = getattr(intent, "payment_method", None)
             if pm_id:
                 pm_obj = stripe.PaymentMethod.retrieve(pm_id)
@@ -305,7 +292,6 @@ def payment_success():
                 elif pm_type == "grabpay":
                     payment_method = "grabpay"
                 elif pm_type == "fpx":
-                    # try to get bank from PaymentMethod object
                     bank = None
                     try:
                         bank = getattr(pm_obj, "fpx", {}).get("bank") if pm_obj and getattr(pm_obj, "fpx", None) else None
@@ -340,7 +326,7 @@ def payment_success():
         customer_from_metadata = md.get("customer_id") or None
         device_from_metadata = md.get("device_id") or None
 
-        # Determine device_id from JWT claims as fallback (if metadata missing)
+        # Determine device_id from JWT claims as fallback
         claims = get_jwt() or {}
         username_claim = claims.get("sub") or get_jwt_identity()
         user_location = claims.get("userLocation", "").upper()
@@ -366,27 +352,27 @@ def payment_success():
         txn = db.session.get(Transaction, pi_id)
 
         # ML PREDICTION (Edge vs Cloud Offloading)
-        processed_at_label = "cloud" # Default
+        processed_at_label = "cloud"
         latency_val = 0.0
         try:
             # Simulate latency logic
             import numpy as np
             import pickle
             import pandas as pd
-            
-            # Load Model (In production, load once at app startup)
+
+            # Load Model
             model_path = os.path.join(current_app.root_path, 'ml_models', 'offloading_model.pkl')
             if os.path.exists(model_path):
                 with open(model_path, 'rb') as f:
                     clf = pickle.load(f)
-                
+
                 # Mock realtime latency (OR accept injection from Load Test)
                 if data.get('latency') is not None:
                      latency_val = float(data.get('latency'))
                 else:
                      latency_val = float(int(np.random.gamma(shape=2.0, scale=10.0)))
                 # device_load_val = float(np.random.uniform(10, 95))
-                
+
                 # Calculate Frequency (Pattern Learning)
                 txn_count = 0
                 if customer_id:
@@ -395,16 +381,16 @@ def payment_success():
                         Transaction.customer_id == customer_id,
                         Transaction.timestamp >= cutoff_date
                     ).count()
-                
+
                 # Predict
                 input_df = pd.DataFrame([{
                     'amount': amount_rm,
-                    'type': 'Transfer', 
+                    'type': 'Transfer',
                     'latency': latency_val,
                     'txn_count_last_30d': txn_count
                 }])
                 processed_at_label = clf.predict(input_df)[0]
-                
+
                 # --- ML PROOF LOGGING ---
                 print("\n" + "="*50)
                 print(f" [ML PROOF - RANDOM FOREST] Transaction Processing")
@@ -422,12 +408,9 @@ def payment_success():
             processed_at_label = "cloud" # Fallback
 
         # --- REALISTIC LATENCY SIMULATION ---
-        # To prove Edge is faster, we intentionally inject network delay for 'Cloud'
-        # simulating the RTT (Round Trip Time) to a remote server.
-        # Edge gets 0 added delay.
         import time
         import random
-        
+
         simulated_delay = 0.0
         if processed_at_label == 'cloud':
             # Simulate WAN RTT: 200ms to 500ms
@@ -448,8 +431,7 @@ def payment_success():
                 amount=amount_rm,
                 stripe_status=final_status,
                 timestamp=datetime.now(timezone(timedelta(hours=8))),
-                
-                # new fields
+
                 old_balance_org=old_balance,
                 new_balance_org=new_balance,
                 is_fraud=False,
@@ -460,11 +442,11 @@ def payment_success():
                 device_id=device_id,
                 customer_id=customer_id,
                 type="Transfer",
-                
+
                 # ML Logic (Real-Time)
                 processing_decision=processed_at_label, # 'edge' or 'cloud'
-                confidence=0.9 if processed_at_label == 'edge' else 0.7, 
-                
+                confidence=0.9 if processed_at_label == 'edge' else 0.7,
+
                 latency=final_latency
 
             )

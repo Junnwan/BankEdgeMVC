@@ -68,7 +68,7 @@ async function fetchDashboardData() {
         }
         const data = await res.json();
 
-        // 1. Update Header Box (Device Info)
+        // Update Header Box (Device Info)
         const deviceBox = document.getElementById('device-info-box');
         if (deviceBox && data.deviceBox) {
             document.getElementById('device-id').textContent = data.deviceBox.id;
@@ -77,21 +77,21 @@ async function fetchDashboardData() {
             document.getElementById('device-sync').textContent = data.deviceBox.syncStatus;
         }
 
-        // 2. Update Latency Chart
+        // Update Latency Chart
         renderLatencyChart(data.latency);
 
-        // 2.2 Render Stat Cards (Balance)
+        // Render Stat Cards (Balance)
         renderDashboardStatCards(data);
 
-        // 2.5 Update Load Chart
+        // Update Load Chart
         if (data.devices) {
             renderLoadChart(data.devices);
         }
 
-        // 3. Update Transactions Table
+        // Update Transactions Table
         renderTransactions(data.transactions);
 
-        // 4. Update Bottom Panel (Edge Devices) - Only if element exists
+        // Update Bottom Panel (Edge Devices) - Only if element exists
         const devicesGrid = document.getElementById('edge-nodes-grid');
         if (devicesGrid && data.devices) {
             renderDevicesGrid(data.devices);
@@ -363,7 +363,7 @@ function renderEdgeDevices(devices) {
                          <div class="value" style="font-size: 0.8rem;">${d.syncStatus}</div>
                     </div>
                 </div>
-                
+
                 <div class="node-meta" style="font-size: 0.8rem; color: var(--muted-text); margin-bottom: 15px;">
                     Last Sync: ${new Date(d.lastSync).toLocaleTimeString()}
                 </div>
@@ -703,17 +703,17 @@ function renderLiveVerification(verification) {
         <div style="position: relative;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
                 <h3 style="margin: 0; display: flex; align-items: center; gap: 10px;">
-                    <i class="fas fa-check-circle" style="color: #10b981;"></i> 
+                    <i class="fas fa-check-circle" style="color: #10b981;"></i>
                     Live Model Verification
                 </h3>
                 <span style="font-size: 0.9rem; color: #666; font-family: monospace;">ID: ${verification.id}</span>
             </div>
-            
+
             <div style="display: flex; gap: 20px; width: 100%;">
                 <div style="flex: 1; background: rgba(0,0,0,0.02); padding: 15px; border-radius: 8px;">
                     <small style="color: #888; text-transform: uppercase; font-size: 0.7rem; font-weight: bold; display: block; margin-bottom: 5px;">Input Features</small>
                     <div style="font-weight: 500;">
-                        <span>Amount: RM ${verification.amount.toFixed(2)}</span> &bull; 
+                        <span>Amount: RM ${verification.amount.toFixed(2)}</span> &bull;
                         <span>Latency: ${verification.latency.toFixed(1)} ms</span>
                     </div>
                 </div>
