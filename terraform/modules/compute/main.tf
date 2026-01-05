@@ -67,6 +67,8 @@ resource "aws_launch_template" "app" {
               docker run -d -p 5000:5000 --restart always \
                 -e DATABASE_URL="postgresql://${var.db_username}:${var.db_password}@${var.db_endpoint}/${var.db_name}" \
                 -e FLASK_ENV=production \
+                -e STRIPE_PUBLISHABLE_KEY="${var.stripe_publishable_key}" \
+                -e STRIPE_SECRET_KEY="${var.stripe_secret_key}" \
                 --name bankedge \
                 ${var.docker_image}
               EOF

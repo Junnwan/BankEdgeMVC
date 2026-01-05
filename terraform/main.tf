@@ -80,6 +80,9 @@ module "compute" {
   db_password = var.db_password
   db_name     = module.database.db_name
 
+  stripe_publishable_key = var.stripe_publishable_key
+  stripe_secret_key      = var.stripe_secret_key
+
   docker_image = var.docker_image
 }
 

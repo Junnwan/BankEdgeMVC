@@ -11,3 +11,6 @@ variable "db_username" {}
 variable "db_password" {}
 variable "db_name" {}
 variable "docker_image" {}
+
+variable "stripe_publishable_key" {}
+variable "stripe_secret_key" {}
