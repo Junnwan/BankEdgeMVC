@@ -81,14 +81,23 @@ jobs:
           --targets "Key=tag:Name,Values=bankedge-app-asg" \
           --comment "Deploying new version of BankEdge" \
           --parameters commands='[
-            "sudo apt-get update && sudo apt-get install -y awscli",
-            "aws --version",
+            "#!/bin/bash",
+            "set -e",
+            "echo \"Installing AWS CLI...\"",
+            "sudo apt-get update -y",
+            "sudo apt-get install -y awscli",
+            "echo \"Logging into Docker...\"",
             "docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}",
+            "echo \"Pulling new image...\"",
             "docker pull ${{ env.DOCKER_IMAGE }}",
+            "echo \"Stopping old container...\"",
             "docker stop bankedge || true",
             "docker rm bankedge || true",
+            "echo \"Fetching secrets...\"",
             "export DB_URL=$(aws ssm get-parameter --name /bankedge/database_url --with-decryption --query Parameter.Value --output text)",
             "export STRIPE_PK=$(aws ssm get-parameter --name /bankedge/stripe_publishable_key --with-decryption --query Parameter.Value --output text)",
             "export STRIPE_SK=$(aws ssm get-parameter --name /bankedge/stripe_secret_key --with-decryption --query Parameter.Value --output text)",
+            "if [ -z \"$STRIPE_PK\" ]; then echo \"ERROR: STRIPE_PK is empty!\"; exit 1; fi",
+            "echo \"Starting container...\"",
             "docker run -d -p 5000:5000 --restart always --name bankedge -e DATABASE_URL=\"$DB_URL\" -e STRIPE_PUBLISHABLE_KEY=\"$STRIPE_PK\" -e STRIPE_SECRET_KEY=\"$STRIPE_SK\" ${{ env.DOCKER_IMAGE }}"
           ]'
