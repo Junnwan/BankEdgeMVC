@@ -43,15 +43,15 @@ class BankEdgeUser(HttpUser):
         
         # --- STRATEGY 1: BEST PRACTICE (Uncomment or use Env Var) ---
         # For AWS testing, it is best to be explicit.
-        # target_user = "admin.kl@bankedge.com" 
+        target_user = "admin.kl@bankedge.com" 
         # target_user = os.environ.get("LOCUST_USER")
         
         # --- STRATEGY 2: CONVENIENCE (DISABLED for Cloud Testing) ---
-        # if not target_user:
-        #     active_user = self.get_latest_user_from_db()
-        #     if active_user:
-        #         print(f"Auto-detected active dashboard user: {active_user}")
-        #         target_user = active_user
+        if not target_user:
+            active_user = self.get_latest_user_from_db()
+            if active_user:
+                print(f"Auto-detected active dashboard user: {active_user}")
+                target_user = active_user
         
         # --- STRATEGY 3: FALLBACK ---
         if not target_user:
