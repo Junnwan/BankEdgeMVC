@@ -46,18 +46,16 @@ class BankEdgeUser(HttpUser):
         # target_user = "admin.kl@bankedge.com" 
         target_user = os.environ.get("LOCUST_USER")
         
-        # --- STRATEGY 2: CONVENIENCE (Auto-detect from Local DB) ---
-        # If no target is set above, we try to guess based on your last local login.
-        # This is great for local demos but optional for cloud testing.
-        if not target_user:
-            active_user = self.get_latest_user_from_db()
-            if active_user:
-                print(f"Auto-detected active dashboard user: {active_user}")
-                target_user = active_user
+        # --- STRATEGY 2: CONVENIENCE (DISABLED for Cloud Testing) ---
+        # if not target_user:
+        #     active_user = self.get_latest_user_from_db()
+        #     if active_user:
+        #         print(f"Auto-detected active dashboard user: {active_user}")
+        #         target_user = active_user
         
         # --- STRATEGY 3: FALLBACK ---
         if not target_user:
-            target_user = "admin.kl@bankedge.com"
+            target_user = "admin.johor@bankedge.com"
 
         try:
             response = self.client.post("/api/login", json={
