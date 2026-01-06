@@ -81,6 +81,9 @@ jobs:
           --targets "Key=tag:Name,Values=bankedge-app-asg" \
           --comment "Deploying new version of BankEdge" \
           --parameters commands='[
+            "sudo apt-get update && sudo apt-get install -y awscli",
+            "aws --version",
+            "docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}",
             "docker pull ${{ env.DOCKER_IMAGE }}",
             "docker stop bankedge || true",
             "docker rm bankedge || true",
