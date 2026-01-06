@@ -4,6 +4,6 @@ __pycache__/
 .env
 .DS_Store
 instance/
-ml_data/
+# ml_data/ (Uncommented to allow Docker inclusion for retraining)
 ml_proof/
 *.pyc

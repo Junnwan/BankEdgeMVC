@@ -11,6 +11,10 @@ COPY . /app
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Train the ML model inside the container to ensure compatibility
+# (Requires ml_data/ to be present in build context)
+RUN python scripts/train_offloading_model.py
+
 # Make port 5000 available to the world outside this container
 EXPOSE 5000
 
